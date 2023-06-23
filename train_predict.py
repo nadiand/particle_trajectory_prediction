@@ -1,7 +1,3 @@
-from dataset import HitsDataset
-from global_constants import *
-from transformer import FittingTransformer
-from dataset import custom_collate #TODO: better placement for this one and the 2 above
 import pandas as pd
 import os
 import torch
@@ -10,13 +6,16 @@ from timeit import default_timer as timer
 from torch.utils.data import DataLoader, random_split
 import math
 import tqdm
+from dataset import HitsDataset, collate_fn #TODO: better placement for this one? 
+from transformer import FittingTransformer
+from global_constants import *
 
 # training function (to be called per epoch)
-def train_epoch(model, optim, disable_tqdm, batch_size):
+def train_epoch(model, optim, disable_tqdm):
     torch.set_grad_enabled(True)
     model.train()
     losses = 0.
-    n_batches = int(math.ceil(len(train_loader.dataset) / batch_size))
+    n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=disable_tqdm)
     for i, data in t:
         event_id, x, y, z, tracks, labels = data
@@ -48,10 +47,10 @@ def train_epoch(model, optim, disable_tqdm, batch_size):
 
 
 # test function
-def evaluate(model, disable_tqdm, batch_size):
+def evaluate(model, disable_tqdm):
     model.eval()
     losses = 0
-    n_batches = int(math.ceil(len(valid_loader.dataset) / batch_size))
+    n_batches = int(math.ceil(len(valid_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(valid_loader), total=n_batches, disable=disable_tqdm)
 
     with torch.no_grad():
@@ -76,43 +75,40 @@ def evaluate(model, disable_tqdm, batch_size):
     return losses / len(valid_loader)
 
 if __name__ == '__main__':
-    hits = pd.read_csv(HITS_DATA_PATH)
-    tracks = pd.read_csv(TRACKS_DATA_PATH)
-    dataset = HitsDataset(hits, tracks)
+    hits = pd.read_csv(HITS_DATA_PATH, header=None)
+    tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
+    dataset = HitsDataset(hits, True, tracks)
 
     # manually specify the GPUs to use
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-    # split dataset into training and validation sets
-    full_len = len(dataset)
-    train_len = int(full_len * 0.8)
-    val_len = full_len - train_len
-    train_set, val_set, = random_split(dataset, [train_len, val_len],
-                                       generator=torch.Generator().manual_seed(7))
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE,
-                              num_workers=4, shuffle=True, collate_fn=custom_collate)
-    valid_loader = DataLoader(val_set, batch_size=BATCH_SIZE,
-                              num_workers=4, shuffle=False, collate_fn=custom_collate)
+    # split dataset into training, validation and test sets
+    train_and_val = int(len(dataset) * (1-TEST_SPLIT))
+    train_len = int(train_and_val * TRAIN_SPLIT)
+    train_set_full, val_set, = random_split(dataset, [train_and_val, (len(dataset)-train_and_val)], generator=torch.Generator().manual_seed(7))
+    train_set, test_set = random_split(train_set_full, [train_len, (train_and_val-train_len)], generator=torch.Generator().manual_seed(7))
+    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, num_workers=4, shuffle=True, collate_fn=collate_fn)
+    valid_loader = DataLoader(val_set, batch_size=BATCH_SIZE, num_workers=4, shuffle=False, collate_fn=collate_fn)
 
     torch.manual_seed(7)  # for reproducibility
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Transformer model
-    transformer = FittingTransformer(num_encoder_layers=4,
-                                     d_model=32,
-                                     n_head=4,
-                                     input_size=3,
-                                     output_size=3,
-                                     dim_feedforward=1)
+    transformer = FittingTransformer(num_encoder_layers=NUM_ENCODER_LAYERS,
+                                     d_model=D_MODEL,
+                                     n_head=N_HEAD,
+                                     input_size=INPUT_SIZE,
+                                     output_size=OUTPUT_SIZE,
+                                     dim_feedforward=DIM_FEEDFORWARD)
     transformer = transformer.to(DEVICE)
-    print(transformer)
+    # print(transformer)
 
     pytorch_total_params = sum(p.numel() for p in transformer.parameters() if p.requires_grad)
     print("Total trainable params: {}".format(pytorch_total_params))
 
     # loss and optimiser
-    loss_fn = torch.nn.MSELoss()  # earth_mover_distance  # EMD loss
+    loss_fn = torch.nn.MSELoss() 
     optimizer = torch.optim.Adam(transformer.parameters(), lr=1e-4)
 
     train_losses, val_losses = [], []
@@ -136,9 +132,9 @@ if __name__ == '__main__':
 
     for epoch in range(epoch, 10 + 1):
         start_time = timer()
-        train_loss = train_epoch(transformer, optimizer, disable, BATCH_SIZE)
+        train_loss = train_epoch(transformer, optimizer, disable)
         end_time = timer()
-        val_loss = evaluate(transformer, disable, BATCH_SIZE)
+        val_loss = evaluate(transformer, disable)
         print((f"Epoch: {epoch}, Train loss: {train_loss:.8f}, "
                f"Val loss: {val_loss:.8f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
 

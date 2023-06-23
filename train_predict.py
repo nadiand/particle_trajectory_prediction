@@ -10,69 +10,62 @@ from transformer import FittingTransformer
 from global_constants import *
 from dataloader import get_dataloaders
 
+# manually specify the GPUs to use
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 # training function (to be called per epoch)
-def train_epoch(model, optim, disable_tqdm):
+def train_epoch(model, optim, disable_tqdm, train_loader):
     torch.set_grad_enabled(True)
     model.train()
     losses = 0.
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=disable_tqdm)
     for i, data in t:
-        event_id, x, y, z, tracks, labels = data
+        event_id, x, labels = data
         x = x.to(DEVICE)
-        y = y.to(DEVICE)
-        if z is not None:
-            z = z.to(DEVICE)
         if labels is not None:
             labels = labels.to(DEVICE)
 
-        # run model
-        if z is not None:
-            pred = model(x, y, z)
-        else:
-            pred = model(x, y)
+        #create mask TODO
 
+        # run model
+        pred = model(x)
         optim.zero_grad()
 
         # loss calculation
         loss = loss_fn(pred, labels)
         loss.backward()  # compute gradients
-
-        t.set_description("loss = %.8f" % loss.item())
-
         optim.step()  # backprop
+        t.set_description("loss = %.8f" % loss.item())
         losses += loss.item()
 
     return losses / len(train_loader)
 
 
 # test function
-def evaluate(model, disable_tqdm):
+def evaluate(model, disable_tqdm, validation_loader):
     model.eval()
     losses = 0
-    n_batches = int(math.ceil(len(valid_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(valid_loader), total=n_batches, disable=disable_tqdm)
+    n_batches = int(math.ceil(len(validation_loader.dataset) / BATCH_SIZE))
+    t = tqdm.tqdm(enumerate(validation_loader), total=n_batches, disable=disable_tqdm)
 
     with torch.no_grad():
         for i, data in t:
-            event_id, x, y, z, tracks, labels = data
+            event_id, x, labels = data
             x = x.to(DEVICE)
-            y = y.to(DEVICE)
-            if z is not None:
-                z = z.to(DEVICE)
-            tracks = tracks.to(DEVICE)
             if labels is not None:
                 labels = labels.to(DEVICE)
 
             # create masks
 
             # run model
-            pred = model(x, y, z)
+            pred = model(x)
 
             loss = loss_fn(pred, labels)
             losses += loss.item()
 
-    return losses / len(valid_loader)
+    return losses / len(validation_loader)
 
 def save_model(type):
     print(f"Saving {type} model with val_loss: {val_loss}")
@@ -86,15 +79,10 @@ def save_model(type):
     }, "transformer_encoder_"+type)
 
 if __name__ == '__main__':
+    # load and split dataset into training, validation and test sets
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
     dataset = HitsDataset(hits, True, tracks)
-
-    # manually specify the GPUs to use
-    os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-
-    # split dataset into training, validation and test sets
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
     # train_and_val = int(len(dataset) * (1-TEST_SPLIT))
     # train_len = int(train_and_val * TRAIN_SPLIT)
@@ -144,9 +132,9 @@ if __name__ == '__main__':
 
     for epoch in range(NUM_EPOCHS):
         start_time = timer() # TODO remove all the unnecessary timers and prints
-        train_loss = train_epoch(transformer, optimizer, disable)
+        train_loss = train_epoch(transformer, optimizer, disable, train_loader)
         end_time = timer()
-        val_loss = evaluate(transformer, disable)
+        val_loss = evaluate(transformer, disable, valid_loader)
         print((f"Epoch: {epoch}, Train loss: {train_loss:.8f}, "
                f"Val loss: {val_loss:.8f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
 

@@ -7,7 +7,7 @@ HITS_DATA_PATH = 'hits_dataframe.csv'
 TRACKS_DATA_PATH = 'tracks_dataframe.csv'
 
 # transformer
-DIMENSION = 2 # the dimensionality of the data
+DIM = 3 # the dimensionality of the data
 NUM_EPOCHS = 1
 BATCH_SIZE = 128
 INPUT_SIZE = 3
@@ -21,3 +21,5 @@ BETA1 = 0.9
 BETA2 = 0.98
 EPS = 1e-9
 EARLY_STOPPING = 30
+PAD_TOKEN = 37
+TEST_BATCH_SIZE = 1

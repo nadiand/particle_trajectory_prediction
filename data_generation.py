@@ -78,6 +78,6 @@ if __name__ == '__main__':
     hits_df = pd.DataFrame(data)
     tracks_df = pd.DataFrame(track_params)
     visualize(hits_df, tracks_df)
-    hits_df.to_csv(HITS_DATA_PATH, header=None)
-    tracks_df.to_csv(TRACKS_DATA_PATH, header=None)
+    hits_df.to_csv(HITS_DATA_PATH, header=None, index=False)
+    tracks_df.to_csv(TRACKS_DATA_PATH, header=None, index=False)
     print("Data generated successfully!")

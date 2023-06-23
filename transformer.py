@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
 
 
-class FittingTransformer(nn.Module):
+class TransformerModel(nn.Module):
     def __init__(self,
                  num_encoder_layers: int,  # number of Transformer encoder layers
                  d_model: int,  # length of the new representation
@@ -18,7 +18,7 @@ class FittingTransformer(nn.Module):
                  dim_feedforward: int = 512,  # dimension of the feedforward network of the Transformer
                  dropout: float = 0.1,  # dropout value
                  seq_len: int = 15):
-        super(FittingTransformer, self).__init__()
+        super(TransformerModel, self).__init__()
         encoder_layers = TransformerEncoderLayer(d_model=d_model,
                                                  nhead=n_head,
                                                  dim_feedforward=dim_feedforward,
@@ -36,13 +36,12 @@ class FittingTransformer(nn.Module):
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-init_range, init_range)
 
-    def forward(self, input: Tensor):
+    def forward(self, input: Tensor, mask: Tensor, padding_mask: Tensor):
         # Linear projection of the input
         src_emb = self.proj_input(input)
         # Transformer encoder
-        memory = self.transformer_encoder(src=src_emb)
+        memory = self.transformer_encoder(src=src_emb, mask=mask, src_key_padding_mask=padding_mask)
         memory = torch.mean(memory, dim=0)
-        # Dropout
         memory = self.dropout(memory)
         # Linear projection of the output
         output = self.decoder(memory)

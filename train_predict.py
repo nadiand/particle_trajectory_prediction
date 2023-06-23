@@ -6,13 +6,30 @@ from timeit import default_timer as timer
 import math
 import tqdm
 from dataset import HitsDataset 
-from transformer import FittingTransformer
+from transformer import TransformerModel
 from global_constants import *
 from dataloader import get_dataloaders
 
 # manually specify the GPUs to use
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+def create_mask(data):
+    src_seq_len = data.shape[0]
+    padding_vector = torch.full((src_seq_len,), PAD_TOKEN)
+    src_mask = torch.zeros((src_seq_len, src_seq_len), device=DEVICE).type(torch.bool)
+    src_padding_mask = (data.transpose(0, 2) == padding_vector).all(dim=0)
+
+    return src_mask, src_padding_mask
+
+def create_output_pred_mask(preds, indices):
+    indices_arr = np.array(indices)
+    row_indices = np.arange(preds.shape[1])[:, np.newaxis]
+    col_indices = np.arange(preds.shape[0])
+    mask = col_indices < indices_arr[row_indices]
+    return mask.T
 
 # training function (to be called per epoch)
 def train_epoch(model, optim, disable_tqdm, train_loader):
@@ -22,19 +39,30 @@ def train_epoch(model, optim, disable_tqdm, train_loader):
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=disable_tqdm)
     for i, data in t:
-        event_id, x, labels = data
+        event_id, x, real_lens, labels = data
         x = x.to(DEVICE)
         if labels is not None:
             labels = labels.to(DEVICE)
 
-        #create mask TODO
+        #create mask
+        src_mask, src_padding_mask = create_mask(x)
 
         # run model
-        pred = model(x)
+        pred = model(x, src_mask, src_padding_mask)
+        pred = pred.transpose(0, 1)
         optim.zero_grad()
 
+        mask = (labels != PAD_TOKEN).float()
+        padding_len = np.round(np.divide(real_lens, NR_DETECTORS))
+        labels = labels * mask
+        pred_mask = create_output_pred_mask(pred, padding_len)
+        pred = pred * torch.tensor(pred_mask).float()
         # loss calculation
-        loss = loss_fn(pred, labels)
+        pred_packed = torch.nn.utils.rnn.pack_padded_sequence(pred, padding_len, batch_first=False, enforce_sorted=False)
+        tgt_packed = torch.nn.utils.rnn.pack_padded_sequence(labels, padding_len, batch_first=False, enforce_sorted=False)
+
+        # loss calculation
+        loss = loss_fn(pred_packed.data, tgt_packed.data)
         loss.backward()  # compute gradients
         optim.step()  # backprop
         t.set_description("loss = %.8f" % loss.item())
@@ -52,17 +80,28 @@ def evaluate(model, disable_tqdm, validation_loader):
 
     with torch.no_grad():
         for i, data in t:
-            event_id, x, labels = data
+            event_id, x, real_lens, labels = data
             x = x.to(DEVICE)
             if labels is not None:
                 labels = labels.to(DEVICE)
 
             # create masks
+            src_mask, src_padding_mask = create_mask(x)
 
             # run model
-            pred = model(x)
+            pred = model(x, src_mask, src_padding_mask)
+            pred = pred.transpose(0, 1)
 
-            loss = loss_fn(pred, labels)
+            mask = (labels != PAD_TOKEN).float()
+            padding_len = np.round(np.divide(real_lens, NR_DETECTORS))
+            labels = labels * mask
+            pred_mask = create_output_pred_mask(pred, padding_len)
+            pred = pred * torch.tensor(pred_mask).float()
+            # loss calculation
+            pred_packed = torch.nn.utils.rnn.pack_padded_sequence(pred, padding_len, batch_first=False, enforce_sorted=False)
+            tgt_packed = torch.nn.utils.rnn.pack_padded_sequence(labels, padding_len, batch_first=False, enforce_sorted=False)
+
+            loss = loss_fn(pred_packed.data, tgt_packed.data)
             losses += loss.item()
 
     return losses / len(validation_loader)
@@ -95,7 +134,7 @@ if __name__ == '__main__':
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Transformer model
-    transformer = FittingTransformer(num_encoder_layers=NUM_ENCODER_LAYERS,
+    transformer = TransformerModel(num_encoder_layers=NUM_ENCODER_LAYERS,
                                      d_model=D_MODEL,
                                      n_head=N_HEAD,
                                      input_size=INPUT_SIZE,

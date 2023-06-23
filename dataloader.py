@@ -19,9 +19,10 @@ def collate_fn(batch):
         xs.append(sample[1])
         ys.append(sample[2])
         zs.append(sample[3])
-        labels.append(sample[5])
+        labels.append(sample[4])
 
-    xs_pad, ys_pad, zs_pad = pad(xs), pad(ys), pad(zs)
+    real_data_len = [len(val) for val in xs]
+    xs_pad, ys_pad, zs_pad, lab_pad = pad(xs), pad(ys), pad(zs), pad(labels)
 
     # labels[0] = nn.ConstantPad1d((0, MAX_NR_TRACKS - labels[0].shape[0]), PAD_TOKEN)(labels[0])
     # labels_pad = pad_sequence(labels, batch_first=False, padding_value=PAD_TOKEN)
@@ -36,7 +37,7 @@ def collate_fn(batch):
     x = torch.stack((xs_pad, ys_pad, zs_pad), dim=1)
 
     # Return the final processed batch
-    return event_ids, x.transpose(1,2), labels
+    return event_ids, x.transpose(1,2), real_data_len, lab_pad
 
 def get_dataloaders(dataset):
     train_and_val = int(len(dataset) * (1-TEST_SPLIT))

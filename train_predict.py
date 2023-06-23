@@ -3,12 +3,12 @@ import os
 import torch
 import numpy as np
 from timeit import default_timer as timer
-from torch.utils.data import DataLoader, random_split
 import math
 import tqdm
-from dataset import HitsDataset, collate_fn #TODO: better placement for this one? 
+from dataset import HitsDataset 
 from transformer import FittingTransformer
 from global_constants import *
+from dataloader import get_dataloaders
 
 # training function (to be called per epoch)
 def train_epoch(model, optim, disable_tqdm):
@@ -74,6 +74,17 @@ def evaluate(model, disable_tqdm):
 
     return losses / len(valid_loader)
 
+def save_model(type):
+    print(f"Saving {type} model with val_loss: {val_loss}")
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': transformer.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'train_losses': train_losses,
+        'val_losses': val_losses,
+        'count': count,
+    }, "transformer_encoder_"+type)
+
 if __name__ == '__main__':
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
@@ -84,12 +95,13 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
     # split dataset into training, validation and test sets
-    train_and_val = int(len(dataset) * (1-TEST_SPLIT))
-    train_len = int(train_and_val * TRAIN_SPLIT)
-    train_set_full, val_set, = random_split(dataset, [train_and_val, (len(dataset)-train_and_val)], generator=torch.Generator().manual_seed(7))
-    train_set, test_set = random_split(train_set_full, [train_len, (train_and_val-train_len)], generator=torch.Generator().manual_seed(7))
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, num_workers=4, shuffle=True, collate_fn=collate_fn)
-    valid_loader = DataLoader(val_set, batch_size=BATCH_SIZE, num_workers=4, shuffle=False, collate_fn=collate_fn)
+    train_loader, valid_loader, test_loader = get_dataloaders(dataset)
+    # train_and_val = int(len(dataset) * (1-TEST_SPLIT))
+    # train_len = int(train_and_val * TRAIN_SPLIT)
+    # train_set_full, val_set, = random_split(dataset, [train_and_val, (len(dataset)-train_and_val)], generator=torch.Generator().manual_seed(7))
+    # train_set, test_set = random_split(train_set_full, [train_len, (train_and_val-train_len)], generator=torch.Generator().manual_seed(7))
+    # train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, num_workers=4, shuffle=True, collate_fn=collate_fn)
+    # valid_loader = DataLoader(val_set, batch_size=BATCH_SIZE, num_workers=4, shuffle=False, collate_fn=collate_fn)
 
     torch.manual_seed(7)  # for reproducibility
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -130,8 +142,8 @@ if __name__ == '__main__':
     else:
         print("Starting training...")
 
-    for epoch in range(epoch, 10 + 1):
-        start_time = timer()
+    for epoch in range(NUM_EPOCHS):
+        start_time = timer() # TODO remove all the unnecessary timers and prints
         train_loss = train_epoch(transformer, optimizer, disable)
         end_time = timer()
         val_loss = evaluate(transformer, disable)
@@ -143,26 +155,10 @@ if __name__ == '__main__':
 
         if val_loss < min_val_loss:
             min_val_loss = val_loss
-            print("Saving best model with val_loss: {}".format(val_loss))
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': transformer.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'train_losses': train_losses,
-                'val_losses': val_losses,
-                'count': count,
-            }, "transformer_encoder_best")
+            save_model("best")
             count = 0
         else:
-            print("Saving last model with val_loss: {}".format(val_loss))
-            torch.save({
-                'epoch': epoch,
-                'model_state_dict': transformer.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'train_losses': train_losses,
-                'val_losses': val_losses,
-                'count': count,
-            }, "transformer_encoder_last")
+            save_model("last")
             count += 1
 
         # if count >= EARLY_STOPPING:

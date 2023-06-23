@@ -2,8 +2,6 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 import pandas as pd
-import torch.nn as nn
-from torch.nn.utils.rnn import pad_sequence
 from global_constants import *
 
 def cart2cyl(x, y, z=None):
@@ -25,40 +23,6 @@ def sort_by_angle(cartesian_coords):
 # def earth_mover_distance(y_true, y_pred):
 #     distance = torch.square(torch.cumsum(y_true, dim=-1) - torch.cumsum(y_pred, dim=-1))
 #     return torch.mean(torch.mean(distance, dim=tuple(range(1, distance.ndim))))
-
-def pad(tens):
-    tens[0] = nn.ConstantPad1d((0, PAD_LEN_DATA - tens[0].shape[0]), PAD_TOKEN)(tens[0])
-    all_padded = pad_sequence(tens, batch_first=False, padding_value=PAD_TOKEN)
-    return all_padded
-
-def collate_fn(batch):
-    event_ids = []
-    xs, ys, zs = [], [], []
-    labels = []
-
-    for sample in batch:
-        event_ids.append(sample[0])
-        xs.append(sample[1])
-        ys.append(sample[2])
-        zs.append(sample[3])
-        labels.append(sample[5])
-
-    xs_pad, ys_pad, zs_pad = pad(xs), pad(ys), pad(zs)
-
-    # labels[0] = nn.ConstantPad1d((0, MAX_NR_TRACKS - labels[0].shape[0]), PAD_TOKEN)(labels[0])
-    # labels_pad = pad_sequence(labels, batch_first=False, padding_value=PAD_TOKEN)
-    # # Convert the lists to tensors, except for the event_id since it might not be a tensor
-    # xs[0] = nn.ConstantPad1d((0, PAD_LEN_DATA - xs[0].shape[0]), PAD_TOKEN)(xs[0])
-    # ys[0] = nn.ConstantPad1d((0, PAD_LEN_DATA - ys[0].shape[0]), PAD_TOKEN)(ys[0])
-    # zs[0] = nn.ConstantPad1d((0, PAD_LEN_DATA - zs[0].shape[0]), PAD_TOKEN)(zs[0])
-
-    # xs_pad = pad_sequence(xs, batch_first=False, padding_value=PAD_TOKEN)
-    # ys_pad = pad_sequence(ys, batch_first=False, padding_value=PAD_TOKEN)
-    # zs_pad = pad_sequence(zs, batch_first=False, padding_value=PAD_TOKEN)
-    x = torch.stack((xs_pad, ys_pad, zs_pad), dim=1)
-
-    # Return the final processed batch
-    return event_ids, x.transpose(1,2), labels
 
 class HitsDataset(Dataset):
 

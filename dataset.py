@@ -56,9 +56,11 @@ def custom_collate(batch):
 class HitsDataset(Dataset):
 
     def __init__(self, data, train, labels=None, to_tensor=True, normalize=True, shuffle=False):
-        self.data = data
-        self.labels = labels
+        self.data = data.fillna(value=PAD_TOKEN)
         self.train = train
+        self.labels = labels
+        if self.train:
+            self.labels = self.labels.fillna(value=PAD_TOKEN)
         if shuffle:
             self.data = self.data.sample(frac=1).reset_index(drop=True)
         self.total_events = self.__len__()
@@ -124,4 +126,4 @@ if __name__ == '__main__':
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
     dataset = HitsDataset(hits, True, tracks)
-    print(dataset.__getitem__(1))
+    print(dataset.data.head())

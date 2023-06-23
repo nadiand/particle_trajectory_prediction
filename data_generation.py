@@ -52,7 +52,8 @@ if __name__ == '__main__':
     for id in range(EVENTS):
         row = []
         param_row = []
-        for t in range(TRACKS_PER_EVENT):
+        nr_tracks = np.random.randint(2, MAX_NR_TRACKS+1)
+        for t in range(nr_tracks):
             param_row.append(t+1) # id of the track
             angle = np.random.uniform(-np.pi, np.pi)
             param_row.append(angle) # parameter of the hit, its angle
@@ -77,7 +78,8 @@ if __name__ == '__main__':
     
     hits_df = pd.DataFrame(data)
     tracks_df = pd.DataFrame(track_params)
-    visualize(hits_df, tracks_df)
+    # visualize(hits_df, tracks_df)
+    # np.savetxt(r'test.txt', hits_df.values)
     hits_df.to_csv(HITS_DATA_PATH, header=None, index=False)
     tracks_df.to_csv(TRACKS_DATA_PATH, header=None, index=False)
     print("Data generated successfully!")

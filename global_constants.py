@@ -24,5 +24,5 @@ BETA1 = 0.9
 BETA2 = 0.98
 EPS = 1e-9
 EARLY_STOPPING = 30
-PAD_TOKEN = 37 # just a random number outside of the range (-pi,pi) so it does not confuse the model
+PAD_TOKEN = 101 # just a random number outside of the range (-pi,pi) and not possible to be a label number so it does not confuse the model
 PAD_LEN_DATA = MAX_NR_TRACKS * NR_DETECTORS

@@ -1,13 +1,6 @@
 import torch
-import torch.nn as nn
-from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, random_split
 from global_constants import *
-
-def pad(tens):
-    tens[0] = nn.ConstantPad1d((0, PAD_LEN_DATA - tens[0].shape[0]), PAD_TOKEN)(tens[0])
-    all_padded = pad_sequence(tens, batch_first=False, padding_value=PAD_TOKEN)
-    return all_padded
 
 def collate_fn(batch):
     event_ids = []
@@ -21,12 +14,16 @@ def collate_fn(batch):
         zs.append(sample[3])
         labels.append(sample[4])
 
-    real_data_len = [len(val) for val in xs]
-    xs_pad, ys_pad, zs_pad, lab_pad = pad(xs), pad(ys), pad(zs), pad(labels)
-    x = torch.stack((xs_pad, ys_pad, zs_pad), dim=1)
+    real_data_len = [len([v for v in val if v != PAD_TOKEN]) for val in xs]
+
+    xs = torch.stack(xs, dim=1)
+    ys = torch.stack(ys, dim=1)
+    zs = torch.stack(zs, dim=1)
+    labels = torch.stack(labels, dim=1)
+    x = torch.stack((xs, ys, zs), dim=1)
 
     # Return the final processed batch
-    return event_ids, x.transpose(1,2), real_data_len, lab_pad
+    return event_ids, x.transpose(1,2), real_data_len, labels
 
 def get_dataloaders(dataset):
     train_and_val = int(len(dataset) * (1-TEST_SPLIT))

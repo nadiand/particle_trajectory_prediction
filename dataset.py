@@ -54,11 +54,10 @@ class HitsDataset(Dataset):
         if self.train:
             event_labels = self.labels.iloc[[idx]].values.tolist()[0]
             labels = event_labels[(DIM-1)::DIM]
-            labels = [float(value) for value in labels if value != PAD_TOKEN]
-            labels = np.sort(labels)
+            # labels = list(filter(lambda value: value != PAD_TOKEN, labels))
             if self.to_tensor:
                 labels = torch.tensor(labels).float()
-
+        
         x = event[0::DIM+1]
         y = event[1::DIM+1]
         z = event[2::DIM+1] if DIM == 3 else [PAD_TOKEN] * len(x)

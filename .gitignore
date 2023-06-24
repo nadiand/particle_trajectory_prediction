@@ -1,2 +1,4 @@
 *.png
 *.csv
+transformer_encoder_best
+transformer_encoder_last

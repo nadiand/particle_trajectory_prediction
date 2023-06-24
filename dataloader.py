@@ -23,17 +23,6 @@ def collate_fn(batch):
 
     real_data_len = [len(val) for val in xs]
     xs_pad, ys_pad, zs_pad, lab_pad = pad(xs), pad(ys), pad(zs), pad(labels)
-
-    # labels[0] = nn.ConstantPad1d((0, MAX_NR_TRACKS - labels[0].shape[0]), PAD_TOKEN)(labels[0])
-    # labels_pad = pad_sequence(labels, batch_first=False, padding_value=PAD_TOKEN)
-    # # Convert the lists to tensors, except for the event_id since it might not be a tensor
-    # xs[0] = nn.ConstantPad1d((0, PAD_LEN_DATA - xs[0].shape[0]), PAD_TOKEN)(xs[0])
-    # ys[0] = nn.ConstantPad1d((0, PAD_LEN_DATA - ys[0].shape[0]), PAD_TOKEN)(ys[0])
-    # zs[0] = nn.ConstantPad1d((0, PAD_LEN_DATA - zs[0].shape[0]), PAD_TOKEN)(zs[0])
-
-    # xs_pad = pad_sequence(xs, batch_first=False, padding_value=PAD_TOKEN)
-    # ys_pad = pad_sequence(ys, batch_first=False, padding_value=PAD_TOKEN)
-    # zs_pad = pad_sequence(zs, batch_first=False, padding_value=PAD_TOKEN)
     x = torch.stack((xs_pad, ys_pad, zs_pad), dim=1)
 
     # Return the final processed batch

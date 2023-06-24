@@ -54,7 +54,6 @@ if __name__ == '__main__':
         param_row = []
         nr_tracks = np.random.randint(2, MAX_NR_TRACKS+1)
         for t in range(nr_tracks):
-            param_row.append(t+1) # id of the track
             angle = np.random.uniform(-np.pi, np.pi)
             param_row.append(angle) # parameter of the hit, its angle
 
@@ -66,6 +65,8 @@ if __name__ == '__main__':
                 x = np.sin(angle) * np.cos(angle2)
                 y = np.sin(angle) * np.sin(angle2)
                 z = np.cos(angle)
+                
+            param_row.append(t+1) # id of the track
             
             for ind, d in enumerate(np.arange(1, NR_DETECTORS+1)):
                 intersection = circle_intersection(d, [0,0], [x,y]) if DIM == 2 else sphere_intersection(d, [0,0,0], [x,y,z])

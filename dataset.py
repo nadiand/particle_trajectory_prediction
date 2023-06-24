@@ -1,8 +1,8 @@
 import torch
 import numpy as np
 from torch.utils.data import Dataset
-import pandas as pd
 from global_constants import *
+
 
 def cart2cyl(x, y, z=None):
     rho = np.sqrt(x ** 2 + y ** 2)
@@ -20,11 +20,10 @@ def sort_by_angle(cartesian_coords):
     return sorted_cartesian_coords
 
 
-# def earth_mover_distance(y_true, y_pred):
-#     distance = torch.square(torch.cumsum(y_true, dim=-1) - torch.cumsum(y_pred, dim=-1))
-#     return torch.mean(torch.mean(distance, dim=tuple(range(1, distance.ndim))))
-
 class HitsDataset(Dataset):
+    # it assumes that we get csvs as input that we can treat like dataframes
+    # also assumes there's no actual index column saved into the csv file and the 
+    # indices will be just assigned as 0...N implicitly without it being a column on its own
 
     def __init__(self, data, train, labels=None, to_tensor=True, normalize=True, shuffle=False):
         self.data = data.fillna(value=PAD_TOKEN)
@@ -54,12 +53,12 @@ class HitsDataset(Dataset):
 
         if self.train:
             event_labels = self.labels.iloc[[idx]].values.tolist()[0]
-            labels = event_labels[0::DIM]
+            labels = event_labels[(DIM-1)::DIM]
+            labels = [float(value) for value in labels if value != PAD_TOKEN]
             labels = np.sort(labels)
             if self.to_tensor:
                 labels = torch.tensor(labels).float()
 
-        # the starting indices might be off ! todo
         x = event[0::DIM+1]
         y = event[1::DIM+1]
         z = event[2::DIM+1] if DIM == 3 else [PAD_TOKEN] * len(x)

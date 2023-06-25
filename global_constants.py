@@ -1,5 +1,5 @@
 # data
-DIM = 3 # the dimensionality of the data
+DIM = 2 # the dimensionality of the data
 NR_DETECTORS = 5
 EVENTS = 5000
 MAX_NR_TRACKS = 20

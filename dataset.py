@@ -53,7 +53,15 @@ class HitsDataset(Dataset):
 
         if self.train:
             event_labels = self.labels.iloc[[idx]].values.tolist()[0]
-            labels = event_labels[(DIM-1)::DIM]
+            if DIM == 2:
+                labels = event_labels[0::DIM]
+            else: #dim==3
+                labels = [] 
+                # TODO check if this is correct
+                for i in range(0, len(event_labels), DIM):
+                    labels.append(event_labels[i])
+                    labels.append(event_labels[i+1])
+            labels = np.sort(labels)
             # labels = list(filter(lambda value: value != PAD_TOKEN, labels))
             if self.to_tensor:
                 labels = torch.tensor(labels).float()
@@ -75,7 +83,9 @@ class HitsDataset(Dataset):
             else: #dim==3
                 convert_list.append((x[i], y[i], z[i]))
 
-        sorted_coords = sort_by_angle(convert_list)
+        sorted_coords = sort_by_angle(convert_list) # maybe instead shuffle them ! TODO
+        #(not just shuffling tho, bc the x y z should still correspond to each other, just make a random list with integers
+        # in that range and use those as the new indices and arrange the x y z using that list)
 
         if DIM == 2:
             x, y = zip(*sorted_coords)

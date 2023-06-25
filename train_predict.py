@@ -39,17 +39,16 @@ def train_epoch(model, optim, disable_tqdm, train_loader):
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=disable_tqdm)
     for i, data in t:
-        event_id, x, real_lens, labels = data
+        event_id, x, real_lens, labels, lab_len = data
         x = x.to(DEVICE)
         if labels is not None:
             labels = labels.to(DEVICE)
 
         #create mask
         src_mask, src_padding_mask = create_mask(x)
-
         # run model
         pred = model(x, src_mask, src_padding_mask)
-        pred = pred.transpose(0, 1)
+        pred = pred.transpose(0, 1) # why ??? TODO if labels stack dim=0 in dataloader, this can be removed ?
         optim.zero_grad()
 
         mask = (labels != PAD_TOKEN).float()
@@ -57,6 +56,7 @@ def train_epoch(model, optim, disable_tqdm, train_loader):
         labels = labels * mask
         pred_mask = create_output_pred_mask(pred, padding_len)
         pred = pred * torch.tensor(pred_mask).float()
+        
         # loss calculation
         pred_packed = torch.nn.utils.rnn.pack_padded_sequence(pred, padding_len, batch_first=False, enforce_sorted=False)
         tgt_packed = torch.nn.utils.rnn.pack_padded_sequence(labels, padding_len, batch_first=False, enforce_sorted=False)
@@ -80,7 +80,7 @@ def evaluate(model, disable_tqdm, validation_loader):
 
     with torch.no_grad():
         for i, data in t:
-            event_id, x, real_lens, labels = data
+            event_id, x, real_lens, labels, lab_len = data
             x = x.to(DEVICE)
             if labels is not None:
                 labels = labels.to(DEVICE)
@@ -123,12 +123,6 @@ if __name__ == '__main__':
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
     dataset = HitsDataset(hits, True, tracks)
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
-    # train_and_val = int(len(dataset) * (1-TEST_SPLIT))
-    # train_len = int(train_and_val * TRAIN_SPLIT)
-    # train_set_full, val_set, = random_split(dataset, [train_and_val, (len(dataset)-train_and_val)], generator=torch.Generator().manual_seed(7))
-    # train_set, test_set = random_split(train_set_full, [train_len, (train_and_val-train_len)], generator=torch.Generator().manual_seed(7))
-    # train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, num_workers=4, shuffle=True, collate_fn=collate_fn)
-    # valid_loader = DataLoader(val_set, batch_size=BATCH_SIZE, num_workers=4, shuffle=False, collate_fn=collate_fn)
 
     torch.manual_seed(7)  # for reproducibility
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

@@ -17,7 +17,7 @@ class TransformerModel(nn.Module):
                  output_size: int,  # size of each item in the output sequence
                  dim_feedforward: int = 512,  # dimension of the feedforward network of the Transformer
                  dropout: float = 0.1,  # dropout value
-                 seq_len: int = 15):
+                 ):
         super(TransformerModel, self).__init__()
         encoder_layers = TransformerEncoderLayer(d_model=d_model,
                                                  nhead=n_head,

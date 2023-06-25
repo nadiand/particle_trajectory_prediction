@@ -86,7 +86,6 @@ if __name__ == '__main__':
     tracks_df = pd.DataFrame(track_params)
     # visualize_hits(hits_df)
     # visualize_track_distribution(tracks_df)
-    # np.savetxt(r'test.txt', hits_df.values)
     hits_df.to_csv(HITS_DATA_PATH, header=None, index=False)
     tracks_df.to_csv(TRACKS_DATA_PATH, header=None, index=False)
     print("Data generated successfully!")

@@ -46,7 +46,6 @@ class HitsDataset(Dataset):
                     labels.append(event_labels[i])
                     labels.append(event_labels[i+1])
             labels = np.sort(labels)
-            # labels = list(filter(lambda value: value != PAD_TOKEN, labels))
             if self.to_tensor:
                 labels = torch.tensor(labels).float()
         

@@ -15,7 +15,6 @@ def collate_fn(batch):
         labels.append(sample[4])
 
     real_data_len = [len([v for v in val if v != PAD_TOKEN]) for val in xs]
-    label_len = [len([v for v in val if v != PAD_TOKEN]) for val in labels] # TODO remove once it works
 
     xs = torch.stack(xs, dim=1)
     ys = torch.stack(ys, dim=1)
@@ -24,7 +23,7 @@ def collate_fn(batch):
     x = torch.stack((xs, ys, zs), dim=1)
 
     # Return the final processed batch
-    return event_ids, x.transpose(1,2), real_data_len, labels, label_len
+    return event_ids, x.transpose(1,2), real_data_len, labels
 
 def get_dataloaders(dataset):
     train_and_val = int(len(dataset) * (1-TEST_SPLIT))

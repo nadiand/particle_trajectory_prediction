@@ -16,7 +16,7 @@ def sphere_intersection(radius, pt1, pt2):
     intersection_point, _ = sphere.intersect_line(line)
     return intersection_point # of the form [x,y,z]
 
-def visualize(hits_df, tracks_df):
+def visualize_hits(hits_df):
     if DIM == 2:
         ax = plt.gca()
         for d in range(NR_DETECTORS+1):
@@ -33,7 +33,12 @@ def visualize(hits_df, tracks_df):
         plt.title("Visualization of a few events")
         plt.savefig('hits_visualized.png')
         plt.show()
+    else:
+        pass
+        # TODO
 
+def visualize_track_distribution(tracks_df):
+    # Same for 2D and 3D data
     plt.title("Distribution of tracks as given by their angles (in rad)")
     tracks = []
     for i in range(1, tracks_df.shape[1], DIM):
@@ -79,7 +84,8 @@ if __name__ == '__main__':
     
     hits_df = pd.DataFrame(data)
     tracks_df = pd.DataFrame(track_params)
-    # visualize(hits_df, tracks_df)
+    # visualize_hits(hits_df)
+    # visualize_track_distribution(tracks_df)
     # np.savetxt(r'test.txt', hits_df.values)
     hits_df.to_csv(HITS_DATA_PATH, header=None, index=False)
     tracks_df.to_csv(TRACKS_DATA_PATH, header=None, index=False)

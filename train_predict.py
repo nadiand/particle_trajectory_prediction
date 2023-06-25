@@ -10,19 +10,22 @@ from transformer import TransformerModel
 from global_constants import *
 from dataloader import get_dataloaders
 
+import pickle
+
 # manually specify the GPUs to use
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+
 def create_mask(data):
     src_seq_len = data.shape[0]
     padding_vector = torch.full((src_seq_len,), PAD_TOKEN)
     src_mask = torch.zeros((src_seq_len, src_seq_len), device=DEVICE).type(torch.bool)
     src_padding_mask = (data.transpose(0, 2) == padding_vector).all(dim=0)
-
     return src_mask, src_padding_mask
+
 
 def create_output_pred_mask(preds, indices):
     indices_arr = np.array(indices)
@@ -31,7 +34,35 @@ def create_output_pred_mask(preds, indices):
     mask = col_indices < indices_arr[row_indices]
     return mask.T
 
-# training function (to be called per epoch)
+
+def prep_labels(labels, real_lens):
+    labels = labels.to(DEVICE)
+    mask = (labels != PAD_TOKEN).float()
+    padding_len = np.round(np.divide(real_lens, NR_DETECTORS))
+    labels = labels * mask
+    return labels, padding_len
+    
+
+def calc_loss(labels, pred, padding_len):
+    pred_packed = torch.nn.utils.rnn.pack_padded_sequence(pred, padding_len, batch_first=False, enforce_sorted=False)
+    tgt_packed = torch.nn.utils.rnn.pack_padded_sequence(labels, padding_len, batch_first=False, enforce_sorted=False)
+
+    # loss calculation
+    loss = loss_fn(pred_packed.data, tgt_packed.data)
+    return loss
+
+
+def make_prediction(model, data, padding_len):
+    src_mask, src_padding_mask = create_mask(data)
+    pred = model(data, src_mask, src_padding_mask)
+    pred = pred.transpose(0, 1)
+
+    pred, _ = torch.sort(pred)
+    pred_mask = create_output_pred_mask(pred, padding_len)
+    pred = pred * torch.tensor(pred_mask).float()
+    return pred
+
+
 def train_epoch(model, optim, disable_tqdm, train_loader):
     torch.set_grad_enabled(True)
     model.train()
@@ -39,30 +70,14 @@ def train_epoch(model, optim, disable_tqdm, train_loader):
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=disable_tqdm)
     for i, data in t:
-        event_id, x, real_lens, labels, lab_len = data
+        event_id, x, real_lens, labels = data
         x = x.to(DEVICE)
-        if labels is not None:
-            labels = labels.to(DEVICE)
 
-        #create mask
-        src_mask, src_padding_mask = create_mask(x)
-        # run model
-        pred = model(x, src_mask, src_padding_mask)
-        pred = pred.transpose(0, 1) # why ??? TODO if labels stack dim=0 in dataloader, this can be removed ?
         optim.zero_grad()
 
-        mask = (labels != PAD_TOKEN).float()
-        padding_len = np.round(np.divide(real_lens, NR_DETECTORS))
-        labels = labels * mask
-        pred_mask = create_output_pred_mask(pred, padding_len)
-        pred = pred * torch.tensor(pred_mask).float()
-        
-        # loss calculation
-        pred_packed = torch.nn.utils.rnn.pack_padded_sequence(pred, padding_len, batch_first=False, enforce_sorted=False)
-        tgt_packed = torch.nn.utils.rnn.pack_padded_sequence(labels, padding_len, batch_first=False, enforce_sorted=False)
-
-        # loss calculation
-        loss = loss_fn(pred_packed.data, tgt_packed.data)
+        labels, padding_len = prep_labels(labels, real_lens)
+        pred = make_prediction(model, x, padding_len)
+        loss = calc_loss(labels, pred, padding_len)
         loss.backward()  # compute gradients
         optim.step()  # backprop
         t.set_description("loss = %.8f" % loss.item())
@@ -71,7 +86,6 @@ def train_epoch(model, optim, disable_tqdm, train_loader):
     return losses / len(train_loader)
 
 
-# test function
 def evaluate(model, disable_tqdm, validation_loader):
     model.eval()
     losses = 0
@@ -80,31 +94,34 @@ def evaluate(model, disable_tqdm, validation_loader):
 
     with torch.no_grad():
         for i, data in t:
-            event_id, x, real_lens, labels, lab_len = data
+            event_id, x, real_lens, labels = data
             x = x.to(DEVICE)
-            if labels is not None:
-                labels = labels.to(DEVICE)
-
-            # create masks
-            src_mask, src_padding_mask = create_mask(x)
-
-            # run model
-            pred = model(x, src_mask, src_padding_mask)
-            pred = pred.transpose(0, 1)
-
-            mask = (labels != PAD_TOKEN).float()
-            padding_len = np.round(np.divide(real_lens, NR_DETECTORS))
-            labels = labels * mask
-            pred_mask = create_output_pred_mask(pred, padding_len)
-            pred = pred * torch.tensor(pred_mask).float()
-            # loss calculation
-            pred_packed = torch.nn.utils.rnn.pack_padded_sequence(pred, padding_len, batch_first=False, enforce_sorted=False)
-            tgt_packed = torch.nn.utils.rnn.pack_padded_sequence(labels, padding_len, batch_first=False, enforce_sorted=False)
-
-            loss = loss_fn(pred_packed.data, tgt_packed.data)
+            labels, padding_len = prep_labels(labels, real_lens)
+            pred = make_prediction(model, x, padding_len)
+            loss = calc_loss(labels, pred, padding_len)
             losses += loss.item()
 
     return losses / len(validation_loader)
+
+
+def predict(model, test_loader, disable_tqdm):
+    torch.set_grad_enabled(True)
+    model.eval()
+    predictions = {}
+    n_batches = int(math.ceil(len(test_loader.dataset) / BATCH_SIZE))
+    t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=disable_tqdm)
+    for i, data in t:
+        event_id, x, real_lens, _ = data
+        x = x.to(DEVICE)
+
+        padding_len = np.round(np.divide(real_lens, NR_DETECTORS))
+        pred = make_prediction(model, x, padding_len)
+        # Append predictions to the list
+        for i, e_id in enumerate(event_id):
+            predictions[e_id] = pred[:, i]
+
+    return predictions
+
 
 def save_model(type):
     print(f"Saving {type} model with val_loss: {val_loss}")
@@ -116,6 +133,7 @@ def save_model(type):
         'val_losses': val_losses,
         'count': count,
     }, "transformer_encoder_"+type)
+
 
 if __name__ == '__main__':
     # load and split dataset into training, validation and test sets
@@ -185,3 +203,8 @@ if __name__ == '__main__':
         # if count >= EARLY_STOPPING:
         #     print("Early stopping...")
         #     break
+
+    preds = predict(transformer, test_loader, disable)
+    # print(preds)
+    # with open('saved_dictionary.pkl', 'wb') as f:
+    #     pickle.dump(preds, f)

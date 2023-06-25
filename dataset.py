@@ -4,22 +4,6 @@ from torch.utils.data import Dataset
 from global_constants import *
 
 
-def cart2cyl(x, y, z=None):
-    rho = np.sqrt(x ** 2 + y ** 2)
-    phi = np.arctan2(y, x)
-    return (rho, phi, z) if z is not None else (rho, phi)
-
-
-def sort_by_angle(cartesian_coords):
-    dist_coords = np.array(cartesian_coords)
-    distances = np.round(np.linalg.norm(dist_coords, axis=1))
-    # Sort first by rho, round the rho, then sort by phi (sorting by the angle on decoder)
-    cylindrical_coords = [cart2cyl(*coord) for coord in cartesian_coords]
-    sorted_indices = np.lexsort((list(zip(*cylindrical_coords))[1], distances))
-    sorted_cartesian_coords = [cartesian_coords[i] for i in sorted_indices]
-    return sorted_cartesian_coords
-
-
 class HitsDataset(Dataset):
     # it assumes that we get csvs as input that we can treat like dataframes
     # also assumes there's no actual index column saved into the csv file and the 
@@ -76,21 +60,13 @@ class HitsDataset(Dataset):
             self.apply_norm(y)
             self.apply_norm(z)
 
-        convert_list = []
-        for i in range(len(x)):
-            if DIM == 2:
-                convert_list.append((x[i], y[i]))
-            else: #dim==3
-                convert_list.append((x[i], y[i], z[i]))
-
-        sorted_coords = sort_by_angle(convert_list) # maybe instead shuffle them ! TODO
-        #(not just shuffling tho, bc the x y z should still correspond to each other, just make a random list with integers
-        # in that range and use those as the new indices and arrange the x y z using that list)
-
-        if DIM == 2:
-            x, y = zip(*sorted_coords)
-        else:
-            x, y, z = zip(*sorted_coords)
+        shuffled_indices = np.arange(0, len(x))
+        np.random.shuffle(shuffled_indices)
+        shuffled_x, shuffled_y, shuffled_z = [], [], []
+        for i in shuffled_indices:
+            shuffled_x.append(x[i])
+            shuffled_y.append(y[i])
+            shuffled_z.append(z[i])
 
         # convert to tensors
         if self.to_tensor:

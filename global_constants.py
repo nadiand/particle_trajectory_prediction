@@ -6,13 +6,18 @@ MAX_NR_TRACKS = 20
 NOISE_STD = 0.1
 HITS_DATA_PATH = 'hits_dataframe.csv'
 TRACKS_DATA_PATH = 'tracks_dataframe.csv'
-TEST_SPLIT = 0.2
-TRAIN_SPLIT = 0.9
+TEST_SPLIT = 0.2 # amount from the full dataset
+TRAIN_SPLIT = 0.9 # amount from the dataset left over after the test split is set aside
 
-# transformer
+# training
 NUM_EPOCHS = 3
 BATCH_SIZE = 32
 TEST_BATCH_SIZE = 1
+EARLY_STOPPING = 30
+PAD_TOKEN = 101 # just a random number outside of the range (-pi,pi) and not possible to be a label number so it does not confuse the model
+PAD_LEN_DATA = MAX_NR_TRACKS * NR_DETECTORS
+
+# transformer
 INPUT_SIZE = 3
 OUTPUT_SIZE = 20
 D_MODEL = 64
@@ -23,6 +28,3 @@ LEARNING_RATE = 1e-4
 BETA1 = 0.9
 BETA2 = 0.98
 EPS = 1e-9
-EARLY_STOPPING = 30
-PAD_TOKEN = 101 # just a random number outside of the range (-pi,pi) and not possible to be a label number so it does not confuse the model
-PAD_LEN_DATA = MAX_NR_TRACKS * NR_DETECTORS

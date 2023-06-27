@@ -2,6 +2,7 @@ import torch
 from torch.utils.data import DataLoader, random_split
 from global_constants import *
 
+
 def collate_fn(batch):
     event_ids = []
     xs, ys, zs = [], [], []
@@ -19,11 +20,12 @@ def collate_fn(batch):
     xs = torch.stack(xs, dim=1)
     ys = torch.stack(ys, dim=1)
     zs = torch.stack(zs, dim=1)
-    labels = torch.stack(labels, dim=1) # why not 0 ??? TODO
+    labels = torch.stack(labels, dim=1)
     x = torch.stack((xs, ys, zs), dim=1)
 
     # Return the final processed batch
     return event_ids, x.transpose(1,2), real_data_len, labels
+
 
 def get_dataloaders(dataset):
     train_and_val = int(len(dataset) * (1-TEST_SPLIT))

@@ -6,7 +6,24 @@ import torch
 from torch import Tensor
 import torch.nn as nn
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from sklearn.metrics import pairwise_distances
+import numpy as np
+import ot
 from global_constants import DIM 
+
+
+# class EarthMoverLoss(nn.Module):
+#     def __init__(self):
+#         super(EarthMoverLoss, self).__init__()
+
+#     def forward(self, predicted_distribution, target_distribution):
+#         distance_matrix = pairwise_distances(
+#             predicted_distribution[:, np.newaxis],
+#             target_distribution[:, np.newaxis],
+#             metric='euclidean'
+#         )
+#         loss = ot.emd2(predicted_distribution, target_distribution, distance_matrix)
+#         return torch.tensor(loss, requires_grad=True)
 
 
 class TransformerModel(nn.Module):
@@ -32,8 +49,8 @@ class TransformerModel(nn.Module):
         # weights initialisation
         self.proj_input.bias.data.zero_()
         self.proj_input.weight.data.uniform_(-init_range, init_range)
-        self.decoder.bias.data.zero_()
-        self.decoder.weight.data.uniform_(-init_range, init_range)
+        self.decoder1.bias.data.zero_()
+        self.decoder1.weight.data.uniform_(-init_range, init_range)
         if DIM == 2:
             self.decoder2.bias.data.zero_()
             self.decoder2.weight.data.uniform_(-init_range, init_range)

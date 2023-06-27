@@ -6,6 +6,7 @@ import torch
 from torch import Tensor
 import torch.nn as nn
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from global_constants import DIM 
 
 
 class TransformerModel(nn.Module):
@@ -19,13 +20,11 @@ class TransformerModel(nn.Module):
                  dropout: float = 0.1,  # dropout value
                  ):
         super(TransformerModel, self).__init__()
-        encoder_layers = TransformerEncoderLayer(d_model=d_model,
-                                                 nhead=n_head,
-                                                 dim_feedforward=dim_feedforward,
-                                                 dropout=dropout)
+        encoder_layers = TransformerEncoderLayer(d_model, n_head, dim_feedforward, dropout)
         self.transformer_encoder = TransformerEncoder(encoder_layers, num_encoder_layers)
         self.proj_input = nn.Linear(input_size, d_model)
-        self.decoder = nn.Linear(d_model, output_size)
+        self.decoder1 = nn.Linear(d_model, output_size)
+        self.decoder2 = nn.Linear(d_model, output_size)
         self.dropout = nn.Dropout(dropout)
         self.init_weights()
 
@@ -35,6 +34,9 @@ class TransformerModel(nn.Module):
         self.proj_input.weight.data.uniform_(-init_range, init_range)
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-init_range, init_range)
+        if DIM == 2:
+            self.decoder2.bias.data.zero_()
+            self.decoder2.weight.data.uniform_(-init_range, init_range)
 
     def forward(self, input: Tensor, mask: Tensor, padding_mask: Tensor):
         # Linear projection of the input
@@ -44,6 +46,7 @@ class TransformerModel(nn.Module):
         memory = torch.mean(memory, dim=0)
         memory = self.dropout(memory)
         # Linear projection of the output
-        output = self.decoder(memory)
-
-        return output
+        if DIM == 2:
+            return self.decoder1(memory)
+        else:
+            return self.decoder1(memory), self.decoder2(memory)

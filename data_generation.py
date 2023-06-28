@@ -8,8 +8,7 @@ from global_constants import *
 def intersection(radius, pt1, pt2):
     detector = Circle(pt1, radius) if DIM == 2 else Sphere(pt1, radius)
     line = Line(pt1, pt2)
-    intersection_point, _ = detector.intersect_line(line)
-    return intersection_point
+    return detector.intersect_line(line)
 
 
 def visualize_hits(hits_df):
@@ -63,6 +62,7 @@ if __name__ == '__main__':
         param_row = []
         nr_tracks = np.random.randint(2, MAX_NR_TRACKS+1)
         for t in range(nr_tracks):
+            line_direction = np.random.randint(2, size=1)[0]
             angle = np.random.uniform(-np.pi, np.pi)
             param_row.append(angle) # parameter of the hit, its angle
 
@@ -76,13 +76,11 @@ if __name__ == '__main__':
                 z = np.cos(angle)
                 
             param_row.append(t+1) # id of the track
-
-            # do i have to do 5 * the coords to get a long enough line? TODO
             
             for ind, d in enumerate(np.arange(1, NR_DETECTORS+1)):
                 origin = [0,0] if DIM == 2 else [0,0,0]
                 point2 = [x,y] if DIM == 2 else [x,y,z]
-                intersection_point = intersection(d, origin, point2) 
+                intersection_point = intersection(d, origin, point2)[line_direction]
                 for coord in intersection_point:
                     row.append(coord + np.random.normal(0, NOISE_STD, 1)[0])
                 row.append(t*NR_DETECTORS+ind+1) # hit1trackid1
@@ -93,7 +91,7 @@ if __name__ == '__main__':
     hits_df = pd.DataFrame(data)
     tracks_df = pd.DataFrame(track_params)
     visualize_hits(hits_df)
-    # visualize_track_distribution(tracks_df)
+    visualize_track_distribution(tracks_df)
     hits_df.to_csv(HITS_DATA_PATH, header=None, index=False)
     tracks_df.to_csv(TRACKS_DATA_PATH, header=None, index=False)
     print("Data generated successfully!")

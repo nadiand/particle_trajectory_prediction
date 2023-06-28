@@ -9,14 +9,13 @@ class HitsDataset(Dataset):
     # also assumes there's no actual index column saved into the csv file and the 
     # indices will be just assigned as 0...N implicitly without it being a column on its own
 
-    def __init__(self, data, train, labels=None, to_tensor=True, normalize=True, shuffle=False):
+    def __init__(self, data, train, labels=None, to_tensor=True, normalize=True, shuffle=True):
         self.data = data.fillna(value=PAD_TOKEN)
         self.train = train
         self.labels = labels
         if self.train:
             self.labels = self.labels.fillna(value=PAD_TOKEN)
-        if shuffle:
-            self.data = self.data.sample(frac=1).reset_index(drop=True)
+        self.shuffle = shuffle # True now because synthesized data has order, irl probably should be False
         self.total_events = self.__len__()
         self.normalize = normalize
         self.to_tensor = to_tensor
@@ -59,13 +58,17 @@ class HitsDataset(Dataset):
             self.apply_norm(y)
             self.apply_norm(z)
 
-        shuffled_indices = np.arange(0, len(x))
-        np.random.shuffle(shuffled_indices)
-        shuffled_x, shuffled_y, shuffled_z = [], [], []
-        for i in shuffled_indices:
-            shuffled_x.append(x[i])
-            shuffled_y.append(y[i])
-            shuffled_z.append(z[i])
+        if self.shuffle:
+            shuffled_indices = np.arange(0, len(x))
+            np.random.shuffle(shuffled_indices)
+            shuffled_x, shuffled_y, shuffled_z = [], [], []
+            for i in shuffled_indices:
+                shuffled_x.append(x[i])
+                shuffled_y.append(y[i])
+                shuffled_z.append(z[i])
+            x = shuffled_x
+            y = shuffled_y
+            z = shuffled_z
 
         # convert to tensors
         if self.to_tensor:

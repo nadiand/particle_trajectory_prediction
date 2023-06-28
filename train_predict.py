@@ -153,13 +153,13 @@ def save_model(type):
 
 
 if __name__ == '__main__':
+    torch.manual_seed(7)  # for reproducibility
+
     # load and split dataset into training, validation and test sets
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
     dataset = HitsDataset(hits, True, tracks)
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
-
-    torch.manual_seed(7)  # for reproducibility
 
     # Transformer model
     transformer = TransformerModel(num_encoder_layers=NUM_ENCODER_LAYERS,

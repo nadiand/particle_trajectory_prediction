@@ -25,7 +25,7 @@ class HitsDataset(Dataset):
 
     @staticmethod
     def apply_norm(X):
-        pass #todo not implemented so dont normalize!!
+        pass #TODO
 
     def __getitem__(self, idx):
         # load event
@@ -40,11 +40,9 @@ class HitsDataset(Dataset):
                 labels = event_labels[0::DIM]
             else: #dim==3
                 labels = [] 
-                # TODO check if this is correct
                 for i in range(0, len(event_labels), DIM):
-                    labels.append(event_labels[i])
-                    labels.append(event_labels[i+1])
-            labels = np.sort(labels)
+                    labels.append((event_labels[i], event_labels[i+1]))
+            labels = np.sort(labels) #TODO how does this work for 3d data?
             if self.to_tensor:
                 labels = torch.tensor(labels).float()
         

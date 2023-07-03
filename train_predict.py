@@ -7,9 +7,10 @@ import math
 import tqdm
 
 from dataset import HitsDataset 
-from transformer import TransformerModel#, EarthMoverLoss
+from transformer import TransformerModel
 from global_constants import *
 from dataloader import get_dataloaders
+from visualization import visualize_tracks
 
 import pickle
 
@@ -20,22 +21,26 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-# def EMD_loss(prediction, target):
-#     # https://github.com/TakaraResearch/Pytorch-1D-Wasserstein-Statistical-Loss/blob/master/pytorch_stats_loss.py
-#     # normalize distribution, add 1e-14 to divisor to avoid 0/0
-#     # this appears to work-ish without soring of the labels and preds, ie train loss goes down
-#     # but the val loss doesnt... it gets worse
-#     tensor_a = prediction / (torch.sum(prediction, dim=-1, keepdim=True) + 1e-14)
-#     tensor_b = target / (torch.sum(target, dim=-1, keepdim=True) + 1e-14)
-#     # make cdf with cumsum
-#     cdf_tensor_a = torch.cumsum(tensor_a, dim=-1)
-#     cdf_tensor_b = torch.cumsum(tensor_b, dim=-1)
-#     cdf_distance = torch.sum(torch.abs((cdf_tensor_a-cdf_tensor_b)), dim=-1)
-#     cdf_loss = cdf_distance.mean()
-#     return cdf_loss
+def earth_mover_distance(y_true, y_pred):
+    distance = torch.square(torch.cumsum(y_true, dim=-1) - torch.cumsum(y_pred, dim=-1))
+    return torch.mean(torch.mean(distance, dim=tuple(range(1, distance.ndim))))
 
+def earth_mover_loss(y_true, y_pred):
+    # https://github.com/titu1994/neural-image-assessment/blob/master/train_mobilenet.py#L49
+    cdf_ytrue = torch.cumsum(y_true, axis=-1)
+    cdf_ypred = torch.cumsum(y_pred, axis=-1)
+    samplewise_emd = torch.sqrt(torch.mean(torch.square(torch.abs(cdf_ytrue - cdf_ypred)), axis=-1))
+    return torch.mean(samplewise_emd)
 
-def create_mask(data):
+def chamfer_distance(y_true, y_pred):
+    # formula from: https://proceedings.neurips.cc/paper_files/paper/2019/file/6e79ed05baec2754e25b4eac73a332d2-Paper.pdf
+    # a set predictoin loss, not caring about placement
+    distances = np.abs(y_pred[:, np.newaxis] - y_true)  # Calculate differences between each pair of pred and target
+    min_dist = np.min(distances)
+    min_dist = np.square(min_dist)
+    return torch.tensor(min_dist, requires_grad=True)
+
+def input_mask(data):
     src_seq_len = data.shape[0]
     padding_vector = torch.full((src_seq_len,), PAD_TOKEN)
     src_mask = torch.zeros((src_seq_len, src_seq_len), device=DEVICE).type(torch.bool)
@@ -43,7 +48,7 @@ def create_mask(data):
     return src_mask, src_padding_mask
 
 
-def create_output_pred_mask(preds, indices):
+def prediction_mask(preds, indices):
     indices_arr = np.array(indices)
     row_indices = np.arange(preds.shape[1])[:, np.newaxis]
     col_indices = np.arange(preds.shape[0])
@@ -56,29 +61,28 @@ def prep_labels(labels):
     mask = (labels != PAD_TOKEN).float()
     labels = labels * mask
     return labels
-    
-
-def calc_loss(labels, pred, padding_len, loss_fn):
-    pred_packed = torch.nn.utils.rnn.pack_padded_sequence(pred, padding_len, batch_first=False, enforce_sorted=False)
-    tgt_packed = torch.nn.utils.rnn.pack_padded_sequence(labels, padding_len, batch_first=False, enforce_sorted=False)
-    # TODO those above are essentially just transposes ! do those 
-
-    # loss calculation
-    # loss = EMD_loss(pred_packed.data, tgt_packed.data)
-    loss = loss_fn(pred_packed.data, tgt_packed.data)
-    return loss
 
 
 def make_prediction(model, data, real_lens):
     padding_len = np.round(np.divide(real_lens, NR_DETECTORS))
-    src_mask, src_padding_mask = create_mask(data)
+    src_mask, src_padding_mask = input_mask(data)
     pred = model(data, src_mask, src_padding_mask)
-    pred = pred.transpose(0, 1)
 
-    pred, _ = torch.sort(pred)
-    pred_mask = create_output_pred_mask(pred, padding_len)
-    pred = pred * torch.tensor(pred_mask).float()
-    return pred, padding_len
+    if DIM == 2:
+        pred = pred.transpose(0, 1)
+        pred, _ = torch.sort(pred)
+        pred_mask = prediction_mask(pred, padding_len)
+        pred = pred * torch.tensor(pred_mask).float()
+    else: #dim==3
+        pred = pred[0].transpose(0, 1), pred[1].transpose(0, 1)
+        # TODO sorting !!
+        pred = torch.stack([pred[0], pred[1]])
+        for slice_ind in range(pred.shape[0]):
+            slice_mask = prediction_mask(pred[slice_ind, :, :], padding_len)
+            pred[slice_ind, :, :] = pred[slice_ind, :, :] * torch.tensor(slice_mask).float()
+        pred = pred.transpose(0, 2)
+        pred = pred.transpose(1, 0)
+    return pred
 
 
 def train_epoch(model, optim, disable_tqdm, train_loader, loss_fn):
@@ -94,8 +98,9 @@ def train_epoch(model, optim, disable_tqdm, train_loader, loss_fn):
         optim.zero_grad()
 
         labels = prep_labels(labels)
-        pred, padding_len = make_prediction(model, x, real_lens)
-        loss = calc_loss(labels, pred, padding_len, loss_fn)
+        pred = make_prediction(model, x, real_lens)
+        loss = loss_fn(pred, labels)
+        # loss = chamfer_distance(pred_packed.data.detach().numpy(), tgt_packed.data.detach().numpy())
         loss.backward()  # compute gradients
         optim.step()  # backprop
         t.set_description("loss = %.8f" % loss.item())
@@ -115,8 +120,13 @@ def evaluate(model, disable_tqdm, validation_loader, loss_fn):
             event_id, x, real_lens, labels = data
             x = x.to(DEVICE)
             labels = prep_labels(labels)
-            pred, padding_len = make_prediction(model, x, real_lens)
-            loss = calc_loss(labels, pred, padding_len, loss_fn)
+            pred = make_prediction(model, x, real_lens)
+
+            # visualize_tracks(pred.detach().numpy())
+            # visualize_tracks(labels.detach().numpy())
+
+            loss = loss_fn(pred, labels)
+            # loss = chamfer_distance(pred_packed.data.detach().numpy(), tgt_packed.data.detach().numpy())
             losses += loss.item()
 
     return losses / len(validation_loader)
@@ -175,7 +185,7 @@ if __name__ == '__main__':
     print("Total trainable params: {}".format(pytorch_total_params))
 
     # loss and optimiser
-    loss_fn = torch.nn.L1Loss() #EarthMoverLoss()
+    loss_fn = torch.nn.L1Loss() #torch.nn.KLDivLoss(reduction="batchmean")
     optimizer = torch.optim.Adam(transformer.parameters(), lr=LEARNING_RATE)
 
     train_losses, val_losses = [], []

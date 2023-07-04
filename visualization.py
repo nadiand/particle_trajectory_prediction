@@ -1,7 +1,7 @@
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 from skspatial.objects import Line, Circle, Sphere
+
 from global_constants import *
 
 
@@ -47,13 +47,38 @@ def visualize_track_distribution(tracks_df):
     plt.savefig('distr_tracks.png')
 
 
-#TODO fix this bs
-def visualize_tracks(angles):
+def visualize_tracks(angles, type):
+    length = NR_DETECTORS+1
+    
     if DIM == 2:
         fig, ax = plt.subplots()
-        length = NR_DETECTORS+1
-        for a in angles:
-            endy = length * math.sin(a)
-            endx = length * math.cos(a)
-            ax.plot([0,endx], [0,endy])
-        plt.show()
+        ax.set_ylim(-6,6)
+        ax.set_xlim(-6,6)
+        for d in np.arange(1, NR_DETECTORS+1):
+            circle = Circle([0,0], d)
+            circle.plot_2d(ax, fill=False)
+    else: # dim==3
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        for d in np.arange(1, NR_DETECTORS+1):
+            sphere = Sphere([0,0,0], d)
+            sphere.plot_3d(ax, alpha=0.1)
+
+    if DIM == 2:
+        for angle in angles:
+            x, y = np.cos(angle), np.sin(angle)
+            print(x,y)
+            x = x+length if x > 0 else x-length
+            y = y+length if y > 0 else y-length
+            #TODO try with the t1,t2 parameters of line ! 
+            # https://scikit-spatial.readthedocs.io/en/stable/api_reference/Line/methods/skspatial.objects.Line.plot_2d.html#skspatial.objects.Line.plot_2d
+            line = Line([0,0], [x,y])
+            line.plot_2d(ax)
+    else: #dim==3
+        for angle, angle2 in angles:
+            x, y, z = np.sin(angle) * np.cos(angle2), np.sin(angle) * np.sin(angle2), np.cos(angle)
+            line = Line([0,0,0], [x,y,z])
+            line.plot_3d(ax)
+        
+    plt.title(f"Reconstruction of {type} tracks")
+    plt.show()

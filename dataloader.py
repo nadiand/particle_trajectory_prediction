@@ -27,14 +27,25 @@ def collate_fn(batch):
     return event_ids, x.transpose(1,2), real_data_len, labels
 
 
-def get_dataloaders(dataset):
+def get_dataloaders(dataset, hyperparam_tuning_config=None):
     train_and_val = int(len(dataset) * (1-TEST_SPLIT))
     train_len = int(train_and_val * TRAIN_SPLIT)
-    train_set_full, val_set, = random_split(dataset, [train_and_val, (len(dataset)-train_and_val)], generator=torch.Generator().manual_seed(7))
+    # thing below doesnt work? doesnt split at all?? TODO
+    # train_set, val_set, test_set = random_split(dataset, [train_len, len(dataset)-train_and_val, train_and_val-train_len], generator=torch.Generator().manual_seed(7))
+    train_set_full, val_set = random_split(dataset, [train_and_val, (len(dataset)-train_and_val)], generator=torch.Generator().manual_seed(7))
     train_set, test_set = random_split(train_set_full, [train_len, (train_and_val-train_len)], generator=torch.Generator().manual_seed(7))
-    
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, num_workers=4, shuffle=True, collate_fn=collate_fn)
-    valid_loader = DataLoader(val_set, batch_size=BATCH_SIZE, num_workers=4, shuffle=False, collate_fn=collate_fn)
+    # print(train_set.dataset.data)
+    # print(val_set.dataset.data)
+    # print(test_set.dataset.data)
+    # exit()
+
+    if hyperparam_tuning_config is not None:
+        batch_size = hyperparam_tuning_config["batch_size"]
+    else:
+        batch_size = BATCH_SIZE
+
+    train_loader = DataLoader(train_set, batch_size=batch_size, num_workers=4, shuffle=True, collate_fn=collate_fn)
+    valid_loader = DataLoader(val_set, batch_size=batch_size, num_workers=4, shuffle=False, collate_fn=collate_fn)
     test_loader = DataLoader(test_set, batch_size=TEST_BATCH_SIZE, num_workers=1, shuffle=False, collate_fn=collate_fn)
 
     return train_loader, valid_loader, test_loader

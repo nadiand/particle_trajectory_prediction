@@ -2,3 +2,5 @@
 *.csv
 transformer_encoder_best
 transformer_encoder_last
+*.pkl
+__pycache__/

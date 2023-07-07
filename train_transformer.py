@@ -50,12 +50,10 @@ def input_mask(data):
 
 def prediction_mask(preds, indices):
     indices_arr = np.array(indices)
-    row_indices = np.arange(preds.shape[1])[:, np.newaxis]
-    col_indices = np.arange(preds.shape[0])
-    # if len(indices_arr) == 1:
-    # print(indices_arr, row_indices, col_indices)
-    mask = col_indices < indices_arr[row_indices]
-    return mask.T
+    mask = torch.ones(preds.shape)
+    for i, length in enumerate(indices_arr):
+        mask[i][int(length):] = False
+    return mask
 
 
 def prep_labels(labels):
@@ -69,7 +67,7 @@ def prep_labels(labels):
 
 
 def make_prediction(model, data, real_lens):
-    data = data.transpose(0,1) #bc i dont use the collate function anymore
+    data = data.transpose(0,1) #bc i dont use the collate function anymore TODO might be different for 3d
     padding_len = np.round(np.divide(real_lens, NR_DETECTORS))
     mask, padding_mask = input_mask(data)
     pred = model(data, mask, padding_mask)
@@ -155,7 +153,7 @@ def predict(model, test_loader, disable_tqdm):
         pred = make_prediction(model, x, real_lens)
         # Append predictions to the list
         for i, e_id in enumerate(event_id):
-            predictions[e_id] = pred[:, i]
+            predictions[e_id] = pred[i]
 
     return predictions
 
@@ -241,7 +239,7 @@ if __name__ == '__main__':
             print("Early stopping...")
             break
 
-    # preds = predict(transformer, test_loader, disable)
-    # print(preds)
+    preds = predict(transformer, test_loader, disable)
+    print(preds)
     # with open('saved_dictionary.pkl', 'wb') as f:
     #     pickle.dump(preds, f)

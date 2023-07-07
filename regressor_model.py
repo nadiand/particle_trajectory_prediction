@@ -7,20 +7,22 @@ class RegressionModel(nn.Module):
 
         self.input_layer = nn.Linear(input_size, hidden_size)
         self.hidden1 = nn.Linear(hidden_size, hidden_size*2)
+        self.relu = nn.ReLU()
         self.hidden2 = nn.Linear(hidden_size*2, hidden_size)
+        self.relu2 = nn.ReLU()
         self.dropout = nn.Dropout(dropout)
         self.output_layer = nn.Linear(hidden_size, output_size)
-        self.softmax = nn.LogSoftmax(dim=1)
         self.init_weights()
 
     def forward(self, input):
         x = self.input_layer(input)
         x = self.hidden1(x)
+        x = self.relu(x)
         x = self.hidden2(x)
+        x = self.relu2(x)
         x = self.dropout(x)
         output = self.output_layer(x)
         output = torch.mean(output, dim=1)
-        output = self.softmax(output)
         return output
 
 

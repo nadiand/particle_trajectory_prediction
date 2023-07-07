@@ -79,7 +79,7 @@ if __name__ == '__main__':
     regressor = RegressionModel(INPUT_SIZE_REGRESS, HIDDEN_SIZE_REGRESS, OUTPUT_SIZE_REGRESS, DROPOUT_REGRESS)
     regressor = regressor.to(DEVICE)
     loss_fn = nn.MSELoss()
-    optimizer = torch.optim.SGD(regressor.parameters(), lr=LEARNING_RATE_REGRESS)
+    optimizer = torch.optim.Adam(regressor.parameters(), lr=LEARNING_RATE_REGRESS)
 
     # load and split dataset into training, validation and test sets
     hits = pd.read_csv(HITS_DATA_PATH, header=None)

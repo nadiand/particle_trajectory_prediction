@@ -10,7 +10,7 @@ from dataloader import get_dataloaders
 from transformer import TransformerModel, EarthMoverLoss
 from dataset import HitsDataset
 from global_constants import *
-from train_predict import train_epoch, evaluate
+from train_predict_transformer import train_epoch, evaluate
 
 
 # manually specify the GPUs to use
@@ -21,7 +21,7 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def hyper_tune(config):
-    transfomer = TransformerModel(num_encoder_layers=config["num_encoder_layers"],
+    transformer = TransformerModel(num_encoder_layers=config["num_encoder_layers"],
                                      d_model=config["d_model"],
                                      n_head=config["n_head"],
                                      input_size=INPUT_SIZE,
@@ -78,6 +78,8 @@ def hyper_tune(config):
     print("Done!")
 
 if __name__ == '__main__':
+    torch.manual_seed(7)
+
     config = {
         "num_encoder_layers": tune.choice([2, 4, 8]),
         "d_model": tune.choice([16, 32, 64, 128]),

@@ -5,28 +5,42 @@ from skspatial.objects import Line, Circle, Sphere
 from global_constants import *
 
 
-def visualize_hits(hits_df):
+def plot_detectors(ax):
+    '''
+    Visualizes the 5 detectors as circular around the origin with radii
+    that are 1 apart, 1...5. For 2D data they are circles and for 3D data
+    they are spheres.
+    '''
     if DIM == 2:
-        fig, ax = plt.subplots()
-        ax.set_ylim(-6,6)
         ax.set_xlim(-6,6)
-        for d in np.arange(1, NR_DETECTORS+1):
-            circle = Circle([0,0], d)
+        ax.set_ylim(-6,6)
+        for det_radius in np.arange(1, NR_DETECTORS+1):
+            circle = Circle([0,0], det_radius)
             circle.plot_2d(ax, fill=False)
     else: # dim==3
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-        for d in np.arange(1, NR_DETECTORS+1):
-            sphere = Sphere([0,0,0], d)
+        for det_radius in np.arange(1, NR_DETECTORS+1):
+            sphere = Sphere([0,0,0], det_radius)
             sphere.plot_3d(ax, alpha=0.1)
 
+
+def visualize_hits(hits_df):
+    '''
+    Visualizes the simplified setup: the 5 detectors as circles/spheres, depending
+    on *DIM* and 5 events as the hits of the generated particles with the detectors.
+    '''
+    # Plot the detectors
+    fig = plt.figure()
+    ax = fig.add_subplot() if DIM == 2 else fig.add_subplot(projection='3d')
+    plot_detectors(ax)
+
+    # Plot 5 events
     for ind in range(5):
         row = hits_df.iloc[ind]
         for i in range(0, len(row), DIM+1):
             if DIM == 2:
                 plt.plot(row[i], row[i+1], marker="o", markerfacecolor="black", markeredgecolor="black")
-            else: 
-                plt.plot(row[i], row[i+1], row[i+2], marker="o", markerfacecolor="black", markeredgecolor="black")
+            else: #dim==3
+                plt.plot(row[i], row[i+1], row[i+2], marker=".", markerfacecolor="black", markeredgecolor="black")
     
     plt.title("Visualization of a few events")
     plt.savefig('hits_visualized.png')
@@ -34,40 +48,39 @@ def visualize_hits(hits_df):
 
 
 def visualize_track_distribution(tracks_df):
-    # Same for 2D and 3D data
-    plt.title("Distribution of tracks as given by their angles (in rad)")
+    '''
+    Creates a histogram of the trajectory parameters distribution. For the 3D
+    case, both parameters are visualized in the same plot.
+    '''
     tracks = []
     for i in range(0, tracks_df.shape[1], DIM):
         tracks.append(tracks_df[i].tolist())
         if DIM == 3:
             tracks.append(tracks_df[i+1].tolist())
-    tracks = [item for sublist in tracks for item in sublist]
+    tracks = [param for track in tracks for param in track]
+
+    plt.title("Distribution of tracks as given by their angles (in rad)")
     plt.hist(tracks)
     plt.show()
     plt.savefig('distr_tracks.png')
 
 
 def visualize_tracks(angles, type):
-    length = NR_DETECTORS+1
+    '''
+    Visualizes the *type* tracks, where *type* is predicted or target, as 
+    well as the detectors. The tracks are reconstructed as lines from their
+    parameters (*angles*).
+    '''
     
-    if DIM == 2:
-        fig, ax = plt.subplots()
-        ax.set_ylim(-6,6)
-        ax.set_xlim(-6,6)
-        for d in np.arange(1, NR_DETECTORS+1):
-            circle = Circle([0,0], d)
-            circle.plot_2d(ax, fill=False)
-    else: # dim==3
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
-        for d in np.arange(1, NR_DETECTORS+1):
-            sphere = Sphere([0,0,0], d)
-            sphere.plot_3d(ax, alpha=0.1)
+    # Plot the detectors
+    fig = plt.figure()
+    ax = fig.add_subplot() if DIM == 2 else fig.add_subplot(projection='3d')
+    plot_detectors(ax)
 
+    length = NR_DETECTORS+1 # TODO not sure if this is the best way, think it's not, see t1t2
     if DIM == 2:
         for angle in angles:
             x, y = np.cos(angle), np.sin(angle)
-            print(x,y)
             x = x+length if x > 0 else x-length
             y = y+length if y > 0 else y-length
             #TODO try with the t1,t2 parameters of line ! 

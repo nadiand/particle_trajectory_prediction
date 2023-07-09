@@ -19,13 +19,11 @@ def train(model, train_loader, loss_fn):
     model.train()
     losses = 0.
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(train_loader, total=n_batches, disable=False)
-    test = []
-    for i, data in enumerate(t):
+    t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=False)
+    for i, data in t:
         event_id, x, labels, _, _ = data
         x = x.to(DEVICE)
         outputs = model(x)
-        test.append((outputs,labels))
         loss = loss_fn(outputs, labels)
 
         optimizer.zero_grad()
@@ -34,8 +32,7 @@ def train(model, train_loader, loss_fn):
 
         losses += loss.item()
 
-    output = losses / len(train_loader)
-    return output, test
+    return losses / len(train_loader)
 
 
 def evaluate(model, val_loader, loss_fn):
@@ -71,6 +68,19 @@ def predict(model, test_loader):
 
     return predictions
 
+
+def save_model(model, type, val_losses, train_losses):
+    print(f"Saving {type} model")
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': model.state_dict(),
+        'train_losses': train_losses,
+        'val_losses': val_losses,
+        'count': count,
+    }, "regressor_"+type)
+
+
 if __name__ == '__main__':
     torch.manual_seed(7)  # for reproducibility
 
@@ -86,20 +96,25 @@ if __name__ == '__main__':
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
 
     min_val_loss = np.inf
+    train_losses, val_losses = [], []
+
     for epoch in range(NUM_EPOCHS):
         start_time = timer()
-        train_loss, test = train(regressor, train_loader, loss_fn)
+        train_loss = train(regressor, train_loader, loss_fn)
         end_time = timer()
         validation_loss = evaluate(regressor, valid_loader, loss_fn)
         print((f"Epoch: {epoch}, Epoch time = {(end_time - start_time):.3f}s, {train_loss:.8f} "
                f"Val loss: {validation_loss:.8f}, Train loss: {train_loss:.8f}"))
-        if epoch == NUM_EPOCHS-1:
-            print(test)
+
+        val_losses.append(validation_loss)
+        train_losses.append(train_loss)
 
         if validation_loss < min_val_loss:
             min_val_loss = validation_loss
+            save_model(regressor, "best", val_losses, train_losses)
             count = 0
         else:
+            save_model(regressor, "last", val_losses, train_losses)
             count += 1
 
         if count >= EARLY_STOPPING:

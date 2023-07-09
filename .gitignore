@@ -1,6 +1,6 @@
 *.png
 *.csv
-transformer_encoder_best
-transformer_encoder_last
+*_best
+*_last
 *.pkl
 __pycache__/

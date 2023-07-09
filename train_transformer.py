@@ -74,7 +74,7 @@ def make_prediction(model, data, real_lens):
 
     if DIM == 2:
         # pred = pred.transpose(0, 1)
-        pred, _ = torch.sort(pred)
+        # pred, _ = torch.sort(pred)
         pred_mask = prediction_mask(pred, padding_len)
         pred = pred * torch.tensor(pred_mask).float()
     else: #dim==3
@@ -128,8 +128,10 @@ def evaluate(model, disable_tqdm, validation_loader, loss_fn):
             pred = make_prediction(model, x, real_lens)
 
             # if i == 1:
+            #     print(pred[0], labels[0])
             #     visualize_tracks(pred.detach().numpy()[0], "predicted")
-                # visualize_tracks(labels.detach().numpy()[0], "true")
+            #     visualize_tracks(labels.detach().numpy()[0], "true")
+            #     exit()
 
             loss = loss_fn(pred, labels)
             # loss = earth_mover_distance(labels, pred)
@@ -220,26 +222,27 @@ if __name__ == '__main__':
         start_time = timer() # TODO remove all the unnecessary timers and prints
         train_loss = train_epoch(transformer, optimizer, disable, train_loader, loss_fn)
         end_time = timer()
-        val_loss = evaluate(transformer, disable, valid_loader, loss_fn)
+        val_loss = 0
+        # val_loss = evaluate(transformer, disable, valid_loader, loss_fn)
         print((f"Train loss: {train_loss:.8f}, "
                f"Val loss: {val_loss:.8f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
 
         train_losses.append(train_loss)
-        val_losses.append(val_loss)
+        # val_losses.append(val_loss)
 
-        if val_loss < min_val_loss:
-            min_val_loss = val_loss
-            save_model("best")
-            count = 0
-        else:
-            save_model("last")
-            count += 1
+        # if val_loss < min_val_loss:
+        #     min_val_loss = val_loss
+        #     save_model("best")
+        #     count = 0
+        # else:
+        #     save_model("last")
+        #     count += 1
 
         if count >= EARLY_STOPPING:
             print("Early stopping...")
             break
 
-    preds = predict(transformer, test_loader, disable)
-    print(preds)
+    # preds = predict(transformer, test_loader, disable)
+    # print(preds)
     # with open('saved_dictionary.pkl', 'wb') as f:
     #     pickle.dump(preds, f)

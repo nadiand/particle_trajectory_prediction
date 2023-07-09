@@ -84,7 +84,7 @@ def save_model(model, type, val_losses, train_losses, epoch, count):
 if __name__ == '__main__':
     torch.manual_seed(7)  # for reproducibility
 
-    regressor = RegressionModel(INPUT_SIZE_REGRESS, HIDDEN_SIZE_REGRESS, OUTPUT_SIZE_REGRESS, DROPOUT_REGRESS)
+    regressor = RegressionModel(DIM, HIDDEN_SIZE_REGRESS, OUTPUT_SIZE_REGRESS, DROPOUT_REGRESS)
     regressor = regressor.to(DEVICE)
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(regressor.parameters(), lr=LEARNING_RATE_REGRESS)
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     # load and split dataset into training, validation and test sets
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
-    dataset = HitsDataset(hits, True, tracks)
+    dataset = HitsDataset(hits, True, tracks, True)
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
 
     min_val_loss = np.inf

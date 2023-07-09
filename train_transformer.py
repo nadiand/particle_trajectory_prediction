@@ -12,8 +12,6 @@ from global_constants import *
 from dataloader import get_dataloaders
 from visualization import visualize_tracks
 
-import pickle
-
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -114,8 +112,8 @@ def train_epoch(model, optim, train_loader, loss_fn):
         # loss = earth_mover_distance(labels, pred)
         # loss = earth_mover_loss(pred, labels)
         # loss = chamfer_distance(pred.detach().numpy(), labels.detach().numpy())
-        loss.backward()  # compute gradients
-        optim.step()  # backprop
+        loss.backward() 
+        optim.step()
         t.set_description("loss = %.8f" % loss.item())
         losses += loss.item()
 
@@ -195,7 +193,7 @@ def save_model(model, type, val_losses, train_losses, epoch, count):
 if __name__ == '__main__':
     torch.manual_seed(7)  # for reproducibility
 
-    # load and split dataset into training, validation and test sets
+    # Load and split dataset into training, validation and test sets
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
     dataset = HitsDataset(hits, True, tracks)
@@ -209,45 +207,44 @@ if __name__ == '__main__':
                                      output_size=MAX_NR_TRACKS,
                                      dim_feedforward=TR_DIM_FEEDFORWARD)
     transformer = transformer.to(DEVICE)
-    # print(transformer)
-
     pytorch_total_params = sum(p.numel() for p in transformer.parameters() if p.requires_grad)
     print("Total trainable params: {}".format(pytorch_total_params))
-
-    # loss and optimiser
     loss_fn = torch.nn.L1Loss() #EarthMoverLoss()  #torch.nn.KLDivLoss(reduction="batchmean")
     optimizer = torch.optim.Adam(transformer.parameters(), lr=TR_LEARNING_RATE)
 
+    # Training
     train_losses, val_losses = [], []
     min_val_loss = np.inf
     epoch, count = 0, 0
 
     for epoch in range(NUM_EPOCHS):
-        print(f"Epoch: {epoch}")
-        start_time = timer() # TODO remove all the unnecessary timers and prints
+        start_time = timer()
+        # Train the model
         train_loss = train_epoch(transformer, optimizer, train_loader, loss_fn)
         end_time = timer()
-        val_loss = 0
+        # Evaluate on validation data
         val_loss = evaluate(transformer, valid_loader, loss_fn)
-        print((f"Train loss: {train_loss:.8f}, "
+        print((f"Epoch: {epoch}, Train loss: {train_loss:.8f}, "
                f"Val loss: {val_loss:.8f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
 
         if val_loss < min_val_loss:
+            # If the model has a new best validation loss, save it as "the best"
             min_val_loss = val_loss
             save_model(transformer, "best", val_losses, train_losses, epoch, count)
             count = 0
         else:
+            # If the model's validation loss isn't better than the best, save it as "the last"
             save_model(transformer, "last", val_losses, train_losses, epoch, count)
             count += 1
 
+        # If the model hasn't improved in a while, stop the training
         # if count >= EARLY_STOPPING:
         #     print("Early stopping...")
         #     break
 
+    # Predict on the test data
     preds = predict(transformer, test_loader)
     print(preds)
-    # with open('saved_dictionary.pkl', 'wb') as f:
-    #     pickle.dump(preds, f)

@@ -1,8 +1,7 @@
-import torch.nn as nn
 import torch
+import numpy as np
 import pandas as pd
 import math
-import numpy as np
 import tqdm
 from timeit import default_timer as timer
 
@@ -15,6 +14,11 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def train(model, train_loader, loss_fn):
+    '''
+    Conducts a single epoch of training: prediction, loss calculation, and loss
+    backpropagation. Returns the average loss over the whole train data.
+    '''
+    # Get the network in train mode
     torch.set_grad_enabled(True)
     model.train()
     losses = 0.
@@ -23,9 +27,11 @@ def train(model, train_loader, loss_fn):
     for i, data in t:
         event_id, x, labels, _, _ = data
         x = x.to(DEVICE)
-        outputs = model(x)
-        loss = loss_fn(outputs, labels)
 
+        # Make prediction
+        outputs = model(x)
+        # Calculate loss and use it to update the weights
+        loss = loss_fn(outputs, labels)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -36,23 +42,33 @@ def train(model, train_loader, loss_fn):
 
 
 def evaluate(model, val_loader, loss_fn):
+    '''
+    Evaluates the network on the validation data by making a prediction and
+    calculating the loss. Returns the average loss over the whole val data.
+    '''
+    # Get the network in evaluation mode
     model.eval()
     losses = 0.
     n_batches = int(math.ceil(len(val_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(val_loader), total=n_batches, disable=DISABLE_TQDM)
-
-    for i, data in t:
-        event_id, x, labels, _, _ = data
-        x = x.to(DEVICE)
-        preds = model(x)
-        preds, _ = torch.sort(preds)
-        loss = loss_fn(preds, labels)
-        losses += loss.item()
+    with torch.no_grad():
+        for i, data in t:
+            event_id, x, labels, _, _ = data
+            x = x.to(DEVICE)
+            # Make prediction
+            preds = model(x)
+            # Calculate loss
+            loss = loss_fn(preds, labels)
+            losses += loss.item()
 
     return losses / len(val_loader)
 
 
 def predict(model, test_loader):
+    '''
+    Evaluates the network on the test data. Returns the predictions
+    '''
+    # Get the network in evaluation mode
     torch.set_grad_enabled(False)
     model.eval()
     predictions = {}
@@ -62,8 +78,8 @@ def predict(model, test_loader):
     for i, data in t:
         event_id, x, _, _, _ = data
         x = x.to(DEVICE)
+        # Make a prediction and append it to the list
         preds = model(x)
-        preds, _ = torch.sort(preds)
         predictions[event_id] = preds
 
     return predictions
@@ -84,25 +100,28 @@ def save_model(model, type, val_losses, train_losses, epoch, count):
 if __name__ == '__main__':
     torch.manual_seed(7)  # for reproducibility
 
-    regressor = RegressionModel(DIM, HIDDEN_SIZE_REGRESS, OUTPUT_SIZE_REGRESS, DROPOUT_REGRESS)
-    regressor = regressor.to(DEVICE)
-    loss_fn = nn.MSELoss()
-    optimizer = torch.optim.Adam(regressor.parameters(), lr=LEARNING_RATE_REGRESS)
-
-    # load and split dataset into training, validation and test sets
+    # Load and split dataset into training, validation and test sets
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
     dataset = HitsDataset(hits, True, tracks, True)
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
 
+    # Regressor Model
+    regressor = RegressionModel(DIM, HIDDEN_SIZE_REGRESS, OUTPUT_SIZE_REGRESS, DROPOUT_REGRESS)
+    regressor = regressor.to(DEVICE)
+    loss_fn = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(regressor.parameters(), lr=LEARNING_RATE_REGRESS)
+
+    # Training
     min_val_loss = np.inf
     train_losses, val_losses = [], []
     count = 0
-
     for epoch in range(NUM_EPOCHS):
         start_time = timer()
+        # Train the model
         train_loss = train(regressor, train_loader, loss_fn)
         end_time = timer()
+        # Evaluate on validation data
         validation_loss = evaluate(regressor, valid_loader, loss_fn)
         print((f"Epoch: {epoch}, Epoch time = {(end_time - start_time):.3f}s, {train_loss:.8f} "
                f"Val loss: {validation_loss:.8f}, Train loss: {train_loss:.8f}"))
@@ -111,15 +130,20 @@ if __name__ == '__main__':
         train_losses.append(train_loss)
 
         if validation_loss < min_val_loss:
+            # If the model has a new best validation loss, save it as "the best"
             min_val_loss = validation_loss
             save_model(regressor, "best", val_losses, train_losses, epoch, count)
             count = 0
         else:
+            # If the model's validation loss isn't better than the best, save it as "the last"
             save_model(regressor, "last", val_losses, train_losses, epoch, count)
             count += 1
 
+        # If the model hasn't improved in a while, stop the training
         if count >= EARLY_STOPPING:
             print("Early stopping...")
             break
 
-    print(predict(regressor, test_loader))
+    # Predict on the test data
+    preds = predict(regressor, test_loader)
+    print(preds)

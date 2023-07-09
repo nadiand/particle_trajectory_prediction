@@ -69,7 +69,7 @@ def predict(model, test_loader):
     return predictions
 
 
-def save_model(model, type, val_losses, train_losses):
+def save_model(model, type, val_losses, train_losses, epoch, count):
     print(f"Saving {type} model")
     torch.save({
         'epoch': epoch,
@@ -97,6 +97,7 @@ if __name__ == '__main__':
 
     min_val_loss = np.inf
     train_losses, val_losses = [], []
+    count = 0
 
     for epoch in range(NUM_EPOCHS):
         start_time = timer()
@@ -111,10 +112,10 @@ if __name__ == '__main__':
 
         if validation_loss < min_val_loss:
             min_val_loss = validation_loss
-            save_model(regressor, "best", val_losses, train_losses)
+            save_model(regressor, "best", val_losses, train_losses, epoch, count)
             count = 0
         else:
-            save_model(regressor, "last", val_losses, train_losses)
+            save_model(regressor, "last", val_losses, train_losses, epoch, count)
             count += 1
 
         if count >= EARLY_STOPPING:

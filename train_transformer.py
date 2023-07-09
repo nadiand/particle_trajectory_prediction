@@ -160,12 +160,12 @@ def predict(model, test_loader, disable_tqdm):
     return predictions
 
 
-def save_model(type):
-    print(f"Saving {type} model with val_loss: {val_loss}")
+def save_model(model, type, val_losses, train_losses, epoch, count):
+    print(f"Saving {type} model")
     torch.save({
         'epoch': epoch,
-        'model_state_dict': transformer.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': model.state_dict(),
         'train_losses': train_losses,
         'val_losses': val_losses,
         'count': count,
@@ -232,10 +232,10 @@ if __name__ == '__main__':
 
         # if val_loss < min_val_loss:
         #     min_val_loss = val_loss
-        #     save_model("best")
+        #     save_model(transformer, "best", val_losses, train_losses, epoch, count)
         #     count = 0
         # else:
-        #     save_model("last")
+        #     save_model(transformer, "last", val_losses, train_losses, epoch, count)
         #     count += 1
 
         if count >= EARLY_STOPPING:

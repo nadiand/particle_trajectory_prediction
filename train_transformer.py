@@ -88,7 +88,7 @@ def make_prediction(model, data, real_lens):
     return pred
 
 
-def train_epoch(model, optim, disable_tqdm, train_loader, loss_fn):
+def train_epoch(model, optim, train_loader, loss_fn):
     '''
     Conducts a single epoch of training: prediction, loss calculation, and loss
     backpropagation. Returns the average loss over the whole train data.
@@ -98,7 +98,7 @@ def train_epoch(model, optim, disable_tqdm, train_loader, loss_fn):
     model.train()
     losses = 0.
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=disable_tqdm)
+    t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=DISABLE_TQDM)
     for i, data in t:
         event_id, x, labels, track_labels, real_lens = data
         x = x.to(DEVICE) #move to make_prediction TODO
@@ -122,7 +122,7 @@ def train_epoch(model, optim, disable_tqdm, train_loader, loss_fn):
     return losses / len(train_loader)
 
 
-def evaluate(model, disable_tqdm, validation_loader, loss_fn):
+def evaluate(model, validation_loader, loss_fn):
     '''
     Evaluates the network on the validation data by making a prediction and
     calculating the loss. Returns the average loss over the whole val data.
@@ -131,7 +131,7 @@ def evaluate(model, disable_tqdm, validation_loader, loss_fn):
     model.eval()
     losses = 0
     n_batches = int(math.ceil(len(validation_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(validation_loader), total=n_batches, disable=disable_tqdm)
+    t = tqdm.tqdm(enumerate(validation_loader), total=n_batches, disable=DISABLE_TQDM)
     with torch.no_grad():
         for i, data in t:
             event_id, x, labels, track_labels, real_lens = data
@@ -158,7 +158,7 @@ def evaluate(model, disable_tqdm, validation_loader, loss_fn):
     return losses / len(validation_loader)
 
 
-def predict(model, test_loader, disable_tqdm):
+def predict(model, test_loader):
     '''
     Evaluates the network on the test data. Returns the predictions
     '''
@@ -167,7 +167,7 @@ def predict(model, test_loader, disable_tqdm):
     model.eval()
     predictions = {}
     n_batches = int(math.ceil(len(test_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=disable_tqdm)
+    t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=DISABLE_TQDM)
     for i, data in t:
         event_id, x, labels, track_labels, real_lens = data
         x = x.to(DEVICE)
@@ -225,10 +225,10 @@ if __name__ == '__main__':
     for epoch in range(NUM_EPOCHS):
         print(f"Epoch: {epoch}")
         start_time = timer() # TODO remove all the unnecessary timers and prints
-        train_loss = train_epoch(transformer, optimizer, DISABLE_TQDM, train_loader, loss_fn)
+        train_loss = train_epoch(transformer, optimizer, train_loader, loss_fn)
         end_time = timer()
         val_loss = 0
-        val_loss = evaluate(transformer, DISABLE_TQDM, valid_loader, loss_fn)
+        val_loss = evaluate(transformer, valid_loader, loss_fn)
         print((f"Train loss: {train_loss:.8f}, "
                f"Val loss: {val_loss:.8f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
 
@@ -247,7 +247,7 @@ if __name__ == '__main__':
         #     print("Early stopping...")
         #     break
 
-    preds = predict(transformer, test_loader, DISABLE_TQDM)
+    preds = predict(transformer, test_loader)
     print(preds)
     # with open('saved_dictionary.pkl', 'wb') as f:
     #     pickle.dump(preds, f)

@@ -81,18 +81,13 @@ def accuracy_score(preds, labels):
     # % of correctly classified points and % of nonpoints given a class
     return accurate_points, inaccurate_pads
 
-def purity_score(y_true, y_pred):
-    # compute contingency matrix (also called confusion matrix)
-    contingency_matrix = metrics.cluster.contingency_matrix(y_true, y_pred)
-    # return purity
-    return torch.tensor(np.sum(np.amax(contingency_matrix, axis=0)) / np.sum(contingency_matrix), requires_grad=True)
 
-def train_epoch(model, optim, disable_tqdm, train_loader, loss_fn):
+def train_epoch(model, optim, train_loader, loss_fn):
     torch.set_grad_enabled(True)
     model.train()
     losses, accuracy, inaccuracy = 0., 0., 0.
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=disable_tqdm)
+    t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=DISABLE_TQDM)
     for i, data in t:
         event_id, x, labels, track_labels, real_lens = data
         x = x.to(DEVICE) #move to make_prediction TODO
@@ -112,11 +107,11 @@ def train_epoch(model, optim, disable_tqdm, train_loader, loss_fn):
     return losses / len(train_loader), accuracy / len(train_loader)
 
 
-def evaluate(model, disable_tqdm, validation_loader, loss_fn):
+def evaluate(model, validation_loader, loss_fn):
     model.eval()
     losses, accuracy, inaccuracy = 0., 0., 0.
     n_batches = int(math.ceil(len(validation_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(validation_loader), total=n_batches, disable=disable_tqdm)
+    t = tqdm.tqdm(enumerate(validation_loader), total=n_batches, disable=DISABLE_TQDM)
     with torch.no_grad():
         for i, data in t:
             event_id, x, labels, track_labels, real_lens = data
@@ -136,12 +131,12 @@ def evaluate(model, disable_tqdm, validation_loader, loss_fn):
     return losses / len(validation_loader), accuracy / len(validation_loader)
 
 
-def predict(model, test_loader, disable_tqdm):
+def predict(model, test_loader):
     torch.set_grad_enabled(False)
     model.eval()
     predictions = {}
     n_batches = int(math.ceil(len(test_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=disable_tqdm)
+    t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=DISABLE_TQDM)
     for i, data in t:
         event_id, x, _, _, real_lens = data
         x = x.to(DEVICE)
@@ -181,7 +176,7 @@ if __name__ == '__main__':
                                      d_model=CL_D_MODEL,
                                      n_head=CL_N_HEAD,
                                      input_size=DIM,
-                                     output_size=CL_OUTPUT_SIZE,
+                                     output_size=MAX_NR_TRACKS,
                                      dim_feedforward=CL_DIM_FEEDFORWARD)
     transformer = transformer.to(DEVICE)
     # print(transformer)
@@ -214,10 +209,10 @@ if __name__ == '__main__':
 
     for epoch in range(NUM_EPOCHS):
         start_time = timer() # TODO remove all the unnecessary timers and prints
-        train_loss, train_accuracy = train_epoch(transformer, optimizer, disable, train_loader, loss_fn)
+        train_loss, train_accuracy = train_epoch(transformer, optimizer, train_loader, loss_fn)
         end_time = timer()
         exit()
-        val_loss, val_accuracy = evaluate(transformer, disable, valid_loader, loss_fn)
+        val_loss, val_accuracy = evaluate(transformer, valid_loader, loss_fn)
         print((f"Epoch: {epoch}, Epoch time = {(end_time - start_time):.3f}s, "
                f"Val loss: {val_loss:.8f}, Train loss: {train_loss:.8f}, "
                f"Val acc: {val_accuracy:.8f}, Train acc: {train_accuracy:.8f}"))
@@ -237,7 +232,7 @@ if __name__ == '__main__':
         #     print("Early stopping...")
         #     break
 
-    preds = predict(transformer, test_loader, disable)
+    preds = predict(transformer, test_loader)
     # print(preds[0])
     print(preds)
     # with open('saved_dictionary.pkl', 'wb') as f:

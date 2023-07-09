@@ -19,7 +19,7 @@ def train(model, train_loader, loss_fn):
     model.train()
     losses = 0.
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=False)
+    t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=DISABLE_TQDM)
     for i, data in t:
         event_id, x, labels, _, _ = data
         x = x.to(DEVICE)
@@ -39,7 +39,7 @@ def evaluate(model, val_loader, loss_fn):
     model.eval()
     losses = 0.
     n_batches = int(math.ceil(len(val_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(val_loader), total=n_batches, disable=False)
+    t = tqdm.tqdm(enumerate(val_loader), total=n_batches, disable=DISABLE_TQDM)
 
     for i, data in t:
         event_id, x, labels, _, _ = data
@@ -57,7 +57,7 @@ def predict(model, test_loader):
     model.eval()
     predictions = {}
     n_batches = int(math.ceil(len(test_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=False)
+    t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=DISABLE_TQDM)
 
     for i, data in t:
         event_id, x, _, _, _ = data

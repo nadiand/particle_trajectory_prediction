@@ -55,14 +55,14 @@ def get_dataloaders(dataset, hyperparam_tuning_config=None):
     train_set, test_set = random_split(train_set_full, [train_len, (train_and_val-train_len)], generator=torch.Generator().manual_seed(7))
 
 
-    if hyperparam_tuning_config is not None:
-        batch_size = hyperparam_tuning_config["batch_size"]
-    else:
-        batch_size = BATCH_SIZE
+    # if hyperparam_tuning_config is not None:
+    #     batch_size = hyperparam_tuning_config["batch_size"]
+    # else:
+    #     batch_size = BATCH_SIZE
 
     # train_loader = DataLoader(dataset, batch_size=batch_size, num_workers=4, shuffle=True)
-    train_loader = DataLoader(train_set, batch_size=batch_size, num_workers=4, shuffle=True)#, collate_fn=collate_fn)
-    valid_loader = DataLoader(val_set, batch_size=batch_size, num_workers=4, shuffle=False)#, collate_fn=collate_fn)
-    test_loader = DataLoader(test_set, batch_size=TEST_BATCH_SIZE, num_workers=1, shuffle=False)#, collate_fn=collate_fn)
+    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=False)#, collate_fn=collate_fn)
+    valid_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)#, collate_fn=collate_fn)
+    test_loader = DataLoader(test_set, batch_size=TEST_BATCH_SIZE, shuffle=False)#, collate_fn=collate_fn)
 
     return train_loader, valid_loader, test_loader

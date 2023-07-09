@@ -9,8 +9,7 @@ from timeit import default_timer as timer
 from dataset import HitsDataset
 from dataloader import get_dataloaders
 from regressor_model import RegressionModel
-from regressor_constants import *
-from global_constants import HITS_DATA_PATH, TRACKS_DATA_PATH
+from global_constants import *
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -20,13 +19,13 @@ def train(model, train_loader, loss_fn):
     model.train()
     losses = 0.
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=False)
-
-    for i, data in t:
+    t = tqdm.tqdm(train_loader, total=n_batches, disable=False)
+    test = []
+    for i, data in enumerate(t):
         event_id, x, labels, _, _ = data
         x = x.to(DEVICE)
-
         outputs = model(x)
+        test.append((outputs,labels))
         loss = loss_fn(outputs, labels)
 
         optimizer.zero_grad()
@@ -35,7 +34,8 @@ def train(model, train_loader, loss_fn):
 
         losses += loss.item()
 
-    return losses / len(train_loader)
+    output = losses / len(train_loader)
+    return output, test
 
 
 def evaluate(model, val_loader, loss_fn):
@@ -49,7 +49,6 @@ def evaluate(model, val_loader, loss_fn):
         x = x.to(DEVICE)
         preds = model(x)
         preds, _ = torch.sort(preds)
-        # shapes and shit arent right, output is bad everything is bad TODO
         loss = loss_fn(preds, labels)
         losses += loss.item()
 
@@ -68,7 +67,6 @@ def predict(model, test_loader):
         x = x.to(DEVICE)
         preds = model(x)
         preds, _ = torch.sort(preds)
-        # shapes and shit arent right, output is bad everything is bad TODO
         predictions[event_id] = preds
 
     return predictions
@@ -90,11 +88,13 @@ if __name__ == '__main__':
     min_val_loss = np.inf
     for epoch in range(NUM_EPOCHS):
         start_time = timer()
-        train_loss = train(regressor, train_loader, loss_fn)
+        train_loss, test = train(regressor, train_loader, loss_fn)
         end_time = timer()
         validation_loss = evaluate(regressor, valid_loader, loss_fn)
-        print((f"Epoch: {epoch}, Epoch time = {(end_time - start_time):.3f}s, "
+        print((f"Epoch: {epoch}, Epoch time = {(end_time - start_time):.3f}s, {train_loss:.8f} "
                f"Val loss: {validation_loss:.8f}, Train loss: {train_loss:.8f}"))
+        if epoch == NUM_EPOCHS-1:
+            print(test)
 
         if validation_loss < min_val_loss:
             min_val_loss = validation_loss

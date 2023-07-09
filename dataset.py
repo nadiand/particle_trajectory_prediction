@@ -21,13 +21,14 @@ class HitsDataset(Dataset):
     for the data itself and the targets respectively.
     '''
 
-    def __init__(self, data, train, labels=None, shuffle=True):
+    def __init__(self, data, train, labels=None, shuffle=True, sort=False):
         self.data = data.fillna(value=PAD_TOKEN)
         self.train = train
         self.targets = labels
         if self.train:
             self.targets = self.targets.fillna(value=PAD_TOKEN)
         self.shuffle = shuffle # True now because synthesized data has order, irl probably should be False
+        self.sort_targets = sort
         self.total_events = self.__len__()
 
     def __len__(self):
@@ -67,8 +68,8 @@ class HitsDataset(Dataset):
                 targets = [] 
                 for i in range(0, len(track_params), DIM):
                     targets.append((track_params[i], track_params[i+1]))
-            # TODO only sort for the small regressor model !!!! or not?? 
-            targets = np.sort(targets) #TODO how does this work for 3d data?
+            if self.sort_targets:
+                targets = np.sort(targets) #TODO how does this work for 3d data?
             targets = torch.tensor(targets).float()
         
             # Also obtain the track ("class") each hit belongs to
@@ -87,7 +88,7 @@ class HitsDataset(Dataset):
 
         # Shuffle data (and corresponding classes) if specified
         if self.shuffle:
-            shuffled_indices = np.arange(0, MAX_LEN_DATA)
+            shuffled_indices = np.arange(0, len(data))
             np.random.shuffle(shuffled_indices)
             shuffled_data, shuffled_track_classes = [], []
             for i in shuffled_indices:

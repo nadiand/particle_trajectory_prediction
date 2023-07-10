@@ -5,7 +5,7 @@ import torch
 class RegressionModel(nn.Module):
     '''
     A feedforward network for regression, which takes the hits (i.e 2D
-    x and y coordinates) and outputs the corresponding trajectories.
+    x and y coordinates) and outputs the corresponding trajectory parameter.
     '''
     def __init__(self, input_size, hidden_size, output_size, dropout):
         super(RegressionModel, self).__init__()

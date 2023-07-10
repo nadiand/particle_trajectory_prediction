@@ -84,12 +84,12 @@ def predict(model, test_loader):
     return predictions
 
 
-def save_model(model, type, val_losses, train_losses, epoch, count):
+def save_model(model, optim, type, val_losses, train_losses, epoch, count):
     print(f"Saving {type} model")
     torch.save({
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': model.state_dict(),
+        'optimizer_state_dict': optim.state_dict(),
         'train_losses': train_losses,
         'val_losses': val_losses,
         'count': count,
@@ -108,6 +108,8 @@ if __name__ == '__main__':
     # Regressor Model
     regressor = RegressionModel(DIM, HIDDEN_SIZE_REGRESS, OUTPUT_SIZE_REGRESS, DROPOUT_REGRESS)
     regressor = regressor.to(DEVICE)
+    total_params = sum(p.numel() for p in regressor.parameters() if p.requires_grad)
+    print("Total trainable params: {}".format(total_params))
     loss_fn = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(regressor.parameters(), lr=LEARNING_RATE_REGRESS)
 
@@ -128,11 +130,11 @@ if __name__ == '__main__':
         if validation_loss < min_val_loss:
             # If the model has a new best validation loss, save it as "the best"
             min_val_loss = validation_loss
-            save_model(regressor, "best", val_losses, train_losses, epoch, count)
+            save_model(regressor, optimizer, "best", val_losses, train_losses, epoch, count)
             count = 0
         else:
             # If the model's validation loss isn't better than the best, save it as "the last"
-            save_model(regressor, "last", val_losses, train_losses, epoch, count)
+            save_model(regressor, optimizer, "last", val_losses, train_losses, epoch, count)
             count += 1
 
         # If the model hasn't improved in a while, stop the training

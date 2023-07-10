@@ -1,10 +1,10 @@
-import pandas as pd
 import torch
 import numpy as np
-from timeit import default_timer as timer
+import pandas as pd
 import math
 import tqdm
 from torch.nn.functional import pad
+from timeit import default_timer as timer
 
 from dataset import HitsDataset 
 from transformer import TransformerModel, EarthMoverLoss
@@ -55,32 +55,28 @@ def prep_labels(labels):
     '''
     labels = labels.to(DEVICE)
     labels = pad(labels, (0,(MAX_NR_TRACKS-labels.shape[1])), "constant", PAD_TOKEN)
-    # Make label mask: by setting all pad tokans to 0 so they don't contribute to loss
-    # TODO what happens actually? are they 0s and preds are 0s and we have no distance?
-    # or is it 0s for labels and 101 for preds?? if the first thing, then thats bad!
     label_mask = (labels != PAD_TOKEN).float()
     labels = labels * label_mask
     return labels
 
 
 def make_prediction(model, data, real_lens):
-    data = data.transpose(0,1) #bc i dont use the collate function anymore TODO might be different for 3d
+    data = data.to(DEVICE)
+    data = data.transpose(0,1) # TODO might be different for 3d
     padding_len = np.round(np.divide(real_lens, NR_DETECTORS))
     mask, padding_mask = input_mask(data)
     pred = model(data, mask, padding_mask)
 
     if DIM == 2:
-        # pred = pred.transpose(0, 1)
-        # pred, _ = torch.sort(pred)
         pred_mask = prediction_mask(pred, padding_len)
         pred = pred * torch.tensor(pred_mask).float()
     else: #dim==3
+        # TODO try this out
         pred = pred[0].transpose(0, 1), pred[1].transpose(0, 1)
-        # TODO sorting !!
         pred = torch.stack([pred[0], pred[1]])
-        for slice_ind in range(pred.shape[0]):
-            slice_mask = prediction_mask(pred[slice_ind, :, :], padding_len)
-            pred[slice_ind, :, :] = pred[slice_ind, :, :] * torch.tensor(slice_mask).float()
+        for i in range(pred.shape[0]):
+            slice_mask = prediction_mask(pred[i, :, :], padding_len)
+            pred[i, :, :] = pred[i, :, :] * torch.tensor(slice_mask).float()
         pred = pred.transpose(0, 2)
         pred = pred.transpose(1, 0)
     return pred
@@ -97,9 +93,8 @@ def train_epoch(model, optim, train_loader, loss_fn):
     losses = 0.
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=DISABLE_TQDM)
-    for i, data in t:
-        event_id, x, labels, track_labels, real_lens = data
-        x = x.to(DEVICE) #move to make_prediction TODO
+    for _, data in t:
+        _, x, labels, _, real_lens = data
 
         optim.zero_grad()
 
@@ -131,9 +126,8 @@ def evaluate(model, validation_loader, loss_fn):
     n_batches = int(math.ceil(len(validation_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(validation_loader), total=n_batches, disable=DISABLE_TQDM)
     with torch.no_grad():
-        for i, data in t:
-            event_id, x, labels, track_labels, real_lens = data
-            x = x.to(DEVICE)
+        for _, data in t:
+            _, x, labels, _, real_lens = data
 
             # Make prediction
             pred = make_prediction(model, x, real_lens)
@@ -166,9 +160,8 @@ def predict(model, test_loader):
     predictions = {}
     n_batches = int(math.ceil(len(test_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=DISABLE_TQDM)
-    for i, data in t:
-        event_id, x, labels, track_labels, real_lens = data
-        x = x.to(DEVICE)
+    for _, data in t:
+        event_id, x, _, _, real_lens = data
 
         # Make a prediction and append it to the list
         pred = make_prediction(model, x, real_lens)
@@ -178,25 +171,25 @@ def predict(model, test_loader):
     return predictions
 
 
-def save_model(model, type, val_losses, train_losses, epoch, count):
+def save_model(model, optim, type, val_losses, train_losses, epoch, count):
     print(f"Saving {type} model")
     torch.save({
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': model.state_dict(),
+        'optimizer_state_dict': optim.state_dict(),
         'train_losses': train_losses,
         'val_losses': val_losses,
         'count': count,
-    }, "transformer_encoder_"+type)
+    }, "direct_transformer_"+type)
 
 
 if __name__ == '__main__':
-    torch.manual_seed(7)  # for reproducibility
+    torch.manual_seed(37)  # for reproducibility
 
     # Load and split dataset into training, validation and test sets
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
-    dataset = HitsDataset(hits, True, tracks)
+    dataset = HitsDataset(hits, True, tracks, True)
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
 
     # Transformer model
@@ -205,11 +198,12 @@ if __name__ == '__main__':
                                      n_head=TR_N_HEAD,
                                      input_size=DIM,
                                      output_size=MAX_NR_TRACKS,
-                                     dim_feedforward=TR_DIM_FEEDFORWARD)
+                                     dim_feedforward=TR_DIM_FEEDFORWARD,
+                                     dropout=TR_DROPOUT)
     transformer = transformer.to(DEVICE)
     pytorch_total_params = sum(p.numel() for p in transformer.parameters() if p.requires_grad)
     print("Total trainable params: {}".format(pytorch_total_params))
-    loss_fn = torch.nn.L1Loss() #EarthMoverLoss()  #torch.nn.KLDivLoss(reduction="batchmean")
+    loss_fn = EarthMoverLoss() #torch.nn.MSELoss()  #torch.nn.KLDivLoss(reduction="batchmean")
     optimizer = torch.optim.Adam(transformer.parameters(), lr=TR_LEARNING_RATE)
 
     # Training
@@ -218,26 +212,23 @@ if __name__ == '__main__':
     epoch, count = 0, 0
 
     for epoch in range(NUM_EPOCHS):
-        start_time = timer()
         # Train the model
         train_loss = train_epoch(transformer, optimizer, train_loader, loss_fn)
-        end_time = timer()
         # Evaluate on validation data
-        val_loss = evaluate(transformer, valid_loader, loss_fn)
-        print((f"Epoch: {epoch}, Train loss: {train_loss:.8f}, "
-               f"Val loss: {val_loss:.8f}, "f"Epoch time = {(end_time - start_time):.3f}s"))
+        validation_loss = evaluate(transformer, valid_loader, loss_fn)
+        print((f"Epoch: {epoch}, Val loss: {validation_loss:.8f}, Train loss: {train_loss:.8f}"))
 
         train_losses.append(train_loss)
-        val_losses.append(val_loss)
+        val_losses.append(validation_loss)
 
-        if val_loss < min_val_loss:
+        if validation_loss < min_val_loss:
             # If the model has a new best validation loss, save it as "the best"
-            min_val_loss = val_loss
-            save_model(transformer, "best", val_losses, train_losses, epoch, count)
+            min_val_loss = validation_loss
+            save_model(transformer, optimizer, "best", val_losses, train_losses, epoch, count)
             count = 0
         else:
             # If the model's validation loss isn't better than the best, save it as "the last"
-            save_model(transformer, "last", val_losses, train_losses, epoch, count)
+            save_model(transformer, optimizer, "last", val_losses, train_losses, epoch, count)
             count += 1
 
         # If the model hasn't improved in a while, stop the training
@@ -248,3 +239,4 @@ if __name__ == '__main__':
     # Predict on the test data
     preds = predict(transformer, test_loader)
     print(preds)
+    # print(train_losses)

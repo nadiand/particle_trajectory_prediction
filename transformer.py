@@ -9,6 +9,10 @@ from global_constants import DIM
 
 
 class EarthMoverLoss(nn.Module):
+    '''
+    An implementation of the Earth Mover Distance (a set-based metric) for the
+    transformer's loss function.
+    '''
     def __init__(self):
         super(EarthMoverLoss, self).__init__()
 

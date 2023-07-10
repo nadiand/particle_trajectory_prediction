@@ -177,7 +177,7 @@ if __name__ == '__main__':
     # Load and split dataset into training, validation and test sets
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
-    dataset = HitsDataset(hits, True, tracks, True)
+    dataset = HitsDataset(hits, True, tracks)
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
 
     # Transformer model

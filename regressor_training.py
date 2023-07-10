@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import math
 import tqdm
-from timeit import default_timer as timer
 
 from dataset import HitsDataset
 from dataloader import get_dataloaders
@@ -24,8 +23,8 @@ def train(model, train_loader, loss_fn):
     losses = 0.
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=DISABLE_TQDM)
-    for i, data in t:
-        event_id, x, labels, _, _ = data
+    for _, data in t:
+        _, x, labels, _, _ = data
         x = x.to(DEVICE)
 
         # Make prediction
@@ -52,8 +51,8 @@ def evaluate(model, val_loader, loss_fn):
     n_batches = int(math.ceil(len(val_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(val_loader), total=n_batches, disable=DISABLE_TQDM)
     with torch.no_grad():
-        for i, data in t:
-            event_id, x, labels, _, _ = data
+        for _, data in t:
+            _, x, labels, _, _ = data
             x = x.to(DEVICE)
             # Make prediction
             preds = model(x)
@@ -75,7 +74,7 @@ def predict(model, test_loader):
     n_batches = int(math.ceil(len(test_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=DISABLE_TQDM)
 
-    for i, data in t:
+    for _, data in t:
         event_id, x, _, _, _ = data
         x = x.to(DEVICE)
         # Make a prediction and append it to the list
@@ -98,7 +97,7 @@ def save_model(model, type, val_losses, train_losses, epoch, count):
 
 
 if __name__ == '__main__':
-    torch.manual_seed(7)  # for reproducibility
+    torch.manual_seed(37)  # for reproducibility
 
     # Load and split dataset into training, validation and test sets
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
@@ -117,14 +116,11 @@ if __name__ == '__main__':
     train_losses, val_losses = [], []
     count = 0
     for epoch in range(NUM_EPOCHS):
-        start_time = timer()
         # Train the model
         train_loss = train(regressor, train_loader, loss_fn)
-        end_time = timer()
         # Evaluate on validation data
         validation_loss = evaluate(regressor, valid_loader, loss_fn)
-        print((f"Epoch: {epoch}, Epoch time = {(end_time - start_time):.3f}s, {train_loss:.8f} "
-               f"Val loss: {validation_loss:.8f}, Train loss: {train_loss:.8f}"))
+        print((f"Epoch: {epoch}, Val loss: {validation_loss:.8f}, Train loss: {train_loss:.8f}"))
 
         val_losses.append(validation_loss)
         train_losses.append(train_loss)
@@ -140,9 +136,9 @@ if __name__ == '__main__':
             count += 1
 
         # If the model hasn't improved in a while, stop the training
-        if count >= EARLY_STOPPING:
-            print("Early stopping...")
-            break
+        # if count >= EARLY_STOPPING:
+        #     print("Early stopping...")
+        #     break
 
     # Predict on the test data
     preds = predict(regressor, test_loader)

@@ -22,7 +22,6 @@ def cluster_data(hits, visualize):
     Clusters hits based on the angles between them and returns the assignment of a cluster ID
     to each hit. If *visualize* is True, it also plots the identified clusters.
     '''
-    print(len(hits))
     algo = AgglomerativeClustering(n_clusters=int(len(hits)/NR_DETECTORS), metric='cosine', linkage='average')
 
     # algo = AgglomerativeClustering(distance_threshold=0.004, n_clusters=None, metric='cosine', linkage='average')
@@ -63,7 +62,7 @@ if __name__ == '__main__':
     visualize = False
     predictions = {}
     for data in test_loader:
-        event_id, x, labels, track_labels, _ = data
+        event_id, x, labels, track_labels = data
         # Convert x and track_labels into lists, ignoring the padded values
         tracks = track_labels[0].numpy()
         x_list, tracks_list = [], []
@@ -75,18 +74,21 @@ if __name__ == '__main__':
         # Cluster hits
         clusters = cluster_data(x_list, visualize)
         accuracy = accuracy_score(list(clusters), tracks_list)
-        # TODO cull some points form clusters if you decide to do the threshold dist
 
         # Group hits together based on predicted cluster IDs
-        groups = {}
+        groups = [ [] for _ in range(max(clusters)+1) ]
         for i, lbl in enumerate(clusters):
-            if lbl in groups.keys():
-                groups[lbl].append(x_list[i])
-            else:
-                groups[lbl] = [x_list[i]]
+            groups[lbl].append(x_list[i])
 
+        # Prune the clusters so that they have at most NR_DETECTOR many hits
+        culled_groups = []
+        for group in groups:
+            if len(group) > NR_DETECTORS:
+                culled_groups.append(group[:NR_DETECTORS])
+            else:
+                culled_groups.append(group)
         # Regress trajectory parameters
-        pred = predict_angle(rnn, clusters)
+        pred = predict_angle(rnn, culled_groups)
         predictions[event_id] = pred
     
     print(predictions)

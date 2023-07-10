@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import math
 import tqdm
+from sklearn.metrics import accuracy_score
 
 from dataset import HitsDataset 
 from classifier_transformer import TransformerClassifier
@@ -42,42 +43,33 @@ def make_prediction(model, data, real_lens):
     return pred
 
 
-def accuracy_score(preds, labels):
-    # TODO maybe we want to calculate the number of actual points to divide by, not the whole dataset
-    accurate_points = 0
-    inaccurate_pads = 0
-    for p, l in zip(preds, labels):
-        for p_x, l_x in zip(p, l):
-            prediction = p_x.argmax()
-            if any(l_x == PAD_TOKEN):
-                if prediction > 0:
-                    inaccurate_pads += 1
-            else:
-                if prediction == l_x.argmax():
-                    accurate_points += 1
-    # % of correctly classified points and % of nonpoints given a class
-    return accurate_points, inaccurate_pads
+def calc_accuracy(preds, labels):
+    y_true, y_pred = [], []
+    for i, l in enumerate(labels):
+        if not PAD_TOKEN in l:
+            y_true.append(l.argmax())
+            y_pred.append(preds[i].argmax())
+    accuracy = accuracy_score(y_true, y_pred)
+    return accuracy
 
 
 def train_epoch(model, optim, train_loader, loss_fn):
     torch.set_grad_enabled(True)
     model.train()
-    losses, accuracy, inaccuracy = 0., 0., 0.
+    losses, accuracy = 0., 0.
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=DISABLE_TQDM)
     for _, data in t:
         _, x, _, track_labels, real_lens = data
-
         optim.zero_grad()
         pred = make_prediction(model, x, real_lens)
-        loss = loss_fn(pred.detach().numpy(), track_labels.detach().numpy())
+        loss = loss_fn(pred, track_labels)
         loss.backward()
         optim.step()
         losses += loss.item()
 
-        acc, inacc = accuracy_score(pred.detach().numpy(), track_labels.numpy())
+        acc = calc_accuracy(pred.detach().numpy()[0], track_labels.numpy()[0])
         accuracy += acc/len(x)
-        inaccuracy += inacc/len(x)
         t.set_description("loss = %.8f, accuracy = %.8f" % (loss.item(), acc/len(x)))
 
     return losses / len(train_loader), accuracy / len(train_loader)
@@ -85,7 +77,7 @@ def train_epoch(model, optim, train_loader, loss_fn):
 
 def evaluate(model, validation_loader, loss_fn):
     model.eval()
-    losses, accuracy, inaccuracy = 0., 0., 0.
+    losses, accuracy = 0., 0.
     n_batches = int(math.ceil(len(validation_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(validation_loader), total=n_batches, disable=DISABLE_TQDM)
     with torch.no_grad():
@@ -97,11 +89,10 @@ def evaluate(model, validation_loader, loss_fn):
             #     visualize_tracks(pred.detach().numpy()[0], "predicted")
                 # visualize_tracks(labels.detach().numpy()[0], "true")
 
-            loss = loss_fn(pred.detach().numpy(), track_labels.detach().numpy())
+            loss = loss_fn(pred, track_labels)
             losses += loss.item()
-            acc, inacc = accuracy_score(pred.detach().numpy(), track_labels.numpy())
+            acc = calc_accuracy(pred.detach().numpy()[0], track_labels.numpy()[0])
             accuracy += acc/len(x)
-            inaccuracy += inacc/len(x)
 
     return losses / len(validation_loader), accuracy / len(validation_loader)
 
@@ -141,14 +132,14 @@ if __name__ == '__main__':
     # Load and split dataset into training, validation and test sets
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
-    dataset = HitsDataset(hits, True, tracks)
+    dataset = HitsDataset(hits, True, tracks, shuffle=False, sort_data=True)
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
 
     # Transformer model
     transformer = TransformerClassifier(num_encoder_layers=CL_NUM_ENCODER_LAYERS,
                                      d_model=CL_D_MODEL,
                                      n_head=CL_N_HEAD,
-                                     input_size=DIM,
+                                     input_size=3,
                                      output_size=MAX_NR_TRACKS,
                                      dim_feedforward=CL_DIM_FEEDFORWARD,
                                      dropout=CL_DROPOUT)

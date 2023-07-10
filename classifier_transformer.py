@@ -3,7 +3,7 @@ import torch.nn as nn
 
 class TransformerClassifier(nn.Module):
     '''
-    A trasnformer network for clustering hits that belong to the same trajectory.
+    A transformer network for clustering hits that belong to the same trajectory.
     Takes the hits (i.e 2D or 3D coordinates) and outputs the probability of each
     hit belonging to each of the 20 possible tracks (classes).
     '''
@@ -15,7 +15,7 @@ class TransformerClassifier(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layers, num_encoder_layers)
         self.dropout = nn.Dropout(dropout)
         self.decoder = nn.Linear(d_model, output_size)
-        self.softmax = nn.Softmax() #i think dim=1 TODO test it out
+        self.softmax = nn.Softmax(dim=0)
         self.init_weights()
 
     def init_weights(self, init_range=0.1) -> None:

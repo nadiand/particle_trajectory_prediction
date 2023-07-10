@@ -24,7 +24,7 @@ def train(model, train_loader, loss_fn):
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=DISABLE_TQDM)
     for _, data in t:
-        _, x, labels, _, _ = data
+        _, x, labels, _ = data
         x = x.to(DEVICE)
 
         # Make prediction
@@ -52,7 +52,7 @@ def evaluate(model, val_loader, loss_fn):
     t = tqdm.tqdm(enumerate(val_loader), total=n_batches, disable=DISABLE_TQDM)
     with torch.no_grad():
         for _, data in t:
-            _, x, labels, _, _ = data
+            _, x, labels, _ = data
             x = x.to(DEVICE)
             # Make prediction
             preds = model(x)
@@ -75,7 +75,7 @@ def predict(model, test_loader):
     t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=DISABLE_TQDM)
 
     for _, data in t:
-        event_id, x, _, _, _ = data
+        event_id, x, _, _ = data
         x = x.to(DEVICE)
         # Make a prediction and append it to the list
         preds = model(x)
@@ -100,9 +100,9 @@ if __name__ == '__main__':
     torch.manual_seed(37)  # for reproducibility
 
     # Load and split dataset into training, validation and test sets
-    hits = pd.read_csv(HITS_DATA_PATH, header=None)
-    tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
-    dataset = HitsDataset(hits, True, tracks, True)
+    hits = pd.read_csv("hits_dataframe_dataset1.csv", header=None)
+    tracks = pd.read_csv("tracks_dataframe_dataset1.csv", header=None)
+    dataset = HitsDataset(hits, True, tracks, sort_targets=True)
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
 
     # Regressor Model
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     min_val_loss = np.inf
     train_losses, val_losses = [], []
     count = 0
-    for epoch in range(NUM_EPOCHS):
+    for epoch in range(500):#NUM_EPOCHS):
         # Train the model
         train_loss = train(regressor, train_loader, loss_fn)
         # Evaluate on validation data
@@ -144,4 +144,4 @@ if __name__ == '__main__':
 
     # Predict on the test data
     preds = predict(regressor, test_loader)
-    print(preds)
+    # print(preds)

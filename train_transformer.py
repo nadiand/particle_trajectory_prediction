@@ -48,10 +48,14 @@ def prep_labels(labels):
     return labels
 
 
-def make_prediction(model, data, real_lens):
+def make_prediction(model, data):
+    lengths = []
+    for batch in data:
+        lengths.append(sum([1 for point in batch if not PAD_TOKEN in point]))
+    padding_len = np.round(np.divide(lengths, NR_DETECTORS))
+
     data = data.to(DEVICE)
     data = data.transpose(0,1) # TODO might be different for 3d
-    padding_len = np.round(np.divide(real_lens, NR_DETECTORS))
     mask, padding_mask = input_mask(data)
     pred = model(data, mask, padding_mask)
 
@@ -82,12 +86,11 @@ def train_epoch(model, optim, train_loader, loss_fn):
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=DISABLE_TQDM)
     for _, data in t:
-        _, x, labels, _, real_lens = data
+        _, x, labels, _ = data
 
         optim.zero_grad()
-
         # Make prediction
-        pred = make_prediction(model, x, real_lens)
+        pred = make_prediction(model, x)
         # Pad and mask labels
         labels = prep_labels(labels)
         # Calculate loss and use it to update weights
@@ -115,10 +118,10 @@ def evaluate(model, validation_loader, loss_fn):
     t = tqdm.tqdm(enumerate(validation_loader), total=n_batches, disable=DISABLE_TQDM)
     with torch.no_grad():
         for _, data in t:
-            _, x, labels, _, real_lens = data
+            _, x, labels, _ = data
 
             # Make prediction
-            pred = make_prediction(model, x, real_lens)
+            pred = make_prediction(model, x)
             # Pad and mask labels
             labels = prep_labels(labels)
             # Calculate loss
@@ -149,10 +152,10 @@ def predict(model, test_loader):
     n_batches = int(math.ceil(len(test_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=DISABLE_TQDM)
     for _, data in t:
-        event_id, x, _, _, real_lens = data
+        event_id, x, _, _ = data
 
         # Make a prediction and append it to the list
-        pred = make_prediction(model, x, real_lens)
+        pred = make_prediction(model, x)
         for i, e_id in enumerate(event_id):
             predictions[e_id] = pred[i]
 
@@ -175,8 +178,8 @@ if __name__ == '__main__':
     torch.manual_seed(37)  # for reproducibility
 
     # Load and split dataset into training, validation and test sets
-    hits = pd.read_csv(HITS_DATA_PATH, header=None)
-    tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
+    hits = pd.read_csv("hits_dataframe_dataset1.csv", header=None)
+    tracks = pd.read_csv("tracks_dataframe_dataset1.csv", header=None)
     dataset = HitsDataset(hits, True, tracks)
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
 
@@ -199,7 +202,7 @@ if __name__ == '__main__':
     min_val_loss = np.inf
     epoch, count = 0, 0
 
-    for epoch in range(NUM_EPOCHS):
+    for epoch in range(200):#NUM_EPOCHS):
         # Train the model
         train_loss = train_epoch(transformer, optimizer, train_loader, loss_fn)
         # Evaluate on validation data

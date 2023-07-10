@@ -31,9 +31,8 @@ def prep_labels(labs):
     return labs
 
 
-def make_prediction(model, data, real_lens):
+def make_prediction(model, data):
     data = data.to(DEVICE)
-    padding_len = np.round(np.divide(real_lens, NR_DETECTORS)) #move this in dataset TODO or better yet collate
     data = data.transpose(0, 1)
     # move things to their dedicated function later on TODO
     mask = torch.zeros((data.shape[0], data.shape[0]), device=DEVICE).type(torch.bool)
@@ -60,9 +59,9 @@ def train_epoch(model, optim, train_loader, loss_fn):
     n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=DISABLE_TQDM)
     for _, data in t:
-        _, x, _, track_labels, real_lens = data
+        _, x, _, track_labels = data
         optim.zero_grad()
-        pred = make_prediction(model, x, real_lens)
+        pred = make_prediction(model, x)
         loss = loss_fn(pred, track_labels)
         loss.backward()
         optim.step()
@@ -82,8 +81,8 @@ def evaluate(model, validation_loader, loss_fn):
     t = tqdm.tqdm(enumerate(validation_loader), total=n_batches, disable=DISABLE_TQDM)
     with torch.no_grad():
         for _, data in t:
-            _, x, _, track_labels, real_lens = data
-            pred = make_prediction(model, x, real_lens)
+            _, x, _, track_labels = data
+            pred = make_prediction(model, x)
 
             # if i == 1:
             #     visualize_tracks(pred.detach().numpy()[0], "predicted")
@@ -104,9 +103,9 @@ def predict(model, test_loader):
     n_batches = int(math.ceil(len(test_loader.dataset) / BATCH_SIZE))
     t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=DISABLE_TQDM)
     for i, data in t:
-        event_id, x, _, _, real_lens = data
+        event_id, x, _, _ = data
 
-        pred = make_prediction(model, x, real_lens)
+        pred = make_prediction(model, x)
         # Append predictions to the list
         for i, e_id in enumerate(event_id):
             predictions[e_id] = pred[i]

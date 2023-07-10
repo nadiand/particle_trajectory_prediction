@@ -1,8 +1,11 @@
 import torch
 import numpy as np
+import math
 from torch.utils.data import Dataset
 
 from global_constants import *
+
+# def angle_sorting():
 
 
 class HitsDataset(Dataset):
@@ -21,14 +24,17 @@ class HitsDataset(Dataset):
     for the data itself and the targets respectively.
     '''
 
-    def __init__(self, data, train, labels=None, shuffle=True, sort=False):
+    def __init__(self, data, train=True, labels=None, shuffle=True, sort_data=False, sort_targets=False):
+        if shuffle and sort_data:
+            raise Exception("Only one out of sort and shuffle can be True at a time!")
         self.data = data.fillna(value=PAD_TOKEN)
         self.train = train
         self.targets = labels
         if self.train:
             self.targets = self.targets.fillna(value=PAD_TOKEN)
         self.shuffle = shuffle # True now because synthesized data has order, irl probably should be False
-        self.sort_targets = sort
+        self.sort_data = sort_data
+        self.sort_targets = sort_targets
         self.total_events = self.__len__()
 
     def __len__(self):
@@ -37,8 +43,6 @@ class HitsDataset(Dataset):
     def __getitem__(self, idx):
         # Load a single event (row)
         event = self.data.iloc[[idx]].values.tolist()[0]
-        # todo: add an actual column with the ID, do not just use the pd id because it's not that generalizable; so that the following is possible:
-        # id = event[0]
         event_id = idx
 
         # Obtain the coordinates of each hit
@@ -55,10 +59,6 @@ class HitsDataset(Dataset):
         else:
             data = torch.stack((x, y), dim=1)
 
-        nr_events = int(sum([1 for e in x if e != PAD_TOKEN])/NR_DETECTORS)
-        real_len = sum([1 for e in x if e != PAD_TOKEN])
-        # print(nr_events)
-
         if self.train:
             # If training, i.e. dataset has targets, obtain the track parameters
             track_params = self.targets.iloc[[idx]].values.tolist()[0]
@@ -74,37 +74,32 @@ class HitsDataset(Dataset):
         
             # Also obtain the track ("class") each hit belongs to
             track_classes = []
-            label = 0
-            for coord in x:
+            for i, coord in enumerate(x):
                 if coord != PAD_TOKEN:
                     # If an actual detected hit, 1-hot encode its "class"
                     track_lbl = [0]*MAX_NR_TRACKS
-                    track_lbl[int(label/NR_DETECTORS)] = 1
+                    track_lbl[int(i/NR_DETECTORS)] = 1
                 else:
                     # If a padded hit, its "class" vector is made of PAD_TOKEN
                     track_lbl = [PAD_TOKEN]*MAX_NR_TRACKS
                 track_classes.append(track_lbl)
-                label += 1
 
         # Shuffle data (and corresponding classes) if specified
         if self.shuffle:
-            shuffled_indices = np.arange(0, len(data))
-            np.random.shuffle(shuffled_indices)
-            shuffled_data, shuffled_track_classes = [], []
-            for i in shuffled_indices:
-                shuffled_data.append(data[i].numpy())
-                shuffled_track_classes.append(track_classes[i])
-            data = shuffled_data
-            track_classes = shuffled_track_classes
-
-        # should targets also be shuffled? TODO if there's sorting of them obv not 
-        # but should we sort them :D:D:D
-        
-        # Convert to tensors
-        if self.train:
+            shuffled_indices = torch.randperm(len(data))
+            data = data[shuffled_indices]
             track_classes = torch.tensor(track_classes).float()
-        data = torch.tensor(np.array(data)).float()
+            track_classes = track_classes[shuffled_indices]
+
+        # Sort data (and corresponding classes) if specified
+        if self.sort_data:
+            if DIM == 2:
+                angles = [math.asin(d[0]/math.sqrt(d[0]**2 + d[1]**2)) for d in data]
+                _, indices = torch.sort(torch.tensor(angles).float())
+                data = data[indices]
+                track_classes = torch.tensor(track_classes).float()
+                track_classes = track_classes[indices]
         
         del event
-        return event_id, data, targets, track_classes, real_len
-    # TODO real_len might be useless and hopefully it is, you should remove it
+        return event_id, data, targets, track_classes
+    

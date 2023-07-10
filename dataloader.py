@@ -3,66 +3,26 @@ from torch.utils.data import DataLoader, random_split
 
 from global_constants import *
 
-def collate_fn(batch):
+
+def get_dataloaders(dataset):
     '''
-    Custom function that does final processing of batches in the dataloader.
-    TODO 
+    Split *dataset* into 3 subsets, train, validation and test, for the training
+    and evaluating of a model.
     '''
-    event_ids = []
-    xs, ys, zs = [], [], []
-    labels = []
-    labels, track_labels = [], []
-
-    event_ids, data, labels, track_labels = batch
-
-    # for sample in batch:
-    #     event_ids.append(sample[0])
-    #     xs.append(sample[1])
-    #     ys.append(sample[2])
-    #     zs.append(sample[3])
-    #     labels.append(sample[4])
-    #     track_labels.append(sample[5])
-
-    for sample in data:
-        xs.append(sample[0])
-    # print()
-
-    real_data_len = [len([v for v in val if v != PAD_TOKEN]) for val in xs]
-    # xs = torch.stack(xs, dim=1)
-    # ys = torch.stack(ys, dim=1)
-    # zs = torch.stack(zs, dim=1)
-    # labels = torch.stack(labels, dim=1)
-    # # print(track_labels)
-    # track_labels = torch.stack(track_labels, dim=1) #something goes wrong TODO fix somehow
-    # # print(track_labels)
-    # # exit()
-    # x = torch.stack((xs, ys, zs), dim=1)
-
-    # Return the final processed batch
-    # print("-----------------------------")
-    # print(track_labels)
-    return event_ids, data, labels, track_labels, real_data_len
-    return event_ids, x.transpose(1,2), real_data_len, labels, track_labels
-
-
-def get_dataloaders(dataset, hyperparam_tuning_config=None):
     train_and_val = int(len(dataset) * (1-TEST_SPLIT))
     train_len = int(train_and_val * TRAIN_SPLIT)
-    # thing below doesnt work? doesnt split at all?? TODO
-    # train_set, val_set, test_set = random_split(dataset, [train_len, len(dataset)-train_and_val, train_and_val-train_len], generator=torch.Generator().manual_seed(7))
-    
-    train_set_full, val_set = random_split(dataset, [train_and_val, (len(dataset)-train_and_val)], generator=torch.Generator().manual_seed(7))
-    train_set, test_set = random_split(train_set_full, [train_len, (train_and_val-train_len)], generator=torch.Generator().manual_seed(7))
+    train_set, val_set, test_set = random_split(dataset, [train_len, len(dataset)-train_and_val, train_and_val-train_len], generator=torch.Generator().manual_seed(37))
 
-
-    # if hyperparam_tuning_config is not None:
-    #     batch_size = hyperparam_tuning_config["batch_size"]
-    # else:
-    #     batch_size = BATCH_SIZE
-
-    # train_loader = DataLoader(dataset, batch_size=batch_size, num_workers=4, shuffle=True)
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=False)#, collate_fn=collate_fn)
-    valid_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)#, collate_fn=collate_fn)
-    test_loader = DataLoader(test_set, batch_size=TEST_BATCH_SIZE, shuffle=False)#, collate_fn=collate_fn)
-
+    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=False)
+    valid_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
+    test_loader = DataLoader(test_set, batch_size=TEST_BATCH_SIZE, shuffle=False)
     return train_loader, valid_loader, test_loader
+
+
+def get_dataloader_predicting(dataset):
+    '''
+    Generate a dataloader out of the dataset and return it. To be used for applying
+    the model in practice.
+    '''
+    data_loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
+    return data_loader

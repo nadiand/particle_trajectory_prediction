@@ -14,27 +14,13 @@ from visualization import visualize_tracks
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-# def input_mask(data):
-#     src_seq_len = data.shape[0]
-#     padding_vector = torch.full((src_seq_len,), PAD_TOKEN)
-#     src_mask = torch.zeros((src_seq_len, src_seq_len), device=DEVICE).type(torch.bool)
-#     src_padding_mask = (data.transpose(0, 2) == padding_vector).all(dim=0)
-#     return src_mask, src_padding_mask
-
-
-def prep_labels(labs):
-    labs = labs.to(DEVICE)
-    # Make label mask: by setting all pad tokens to 0
-    label_mask = (labs != PAD_TOKEN).float()
-    # print(label_mask)
-    labs = labs * label_mask
-    return labs
-
-
 def make_prediction(model, data):
+    '''
+    Create the input mask and the attention padding mask based on *data* and
+    pass them to the model for prediction.
+    '''
     data = data.to(DEVICE)
     data = data.transpose(0, 1)
-    # move things to their dedicated function later on TODO
     mask = torch.zeros((data.shape[0], data.shape[0]), device=DEVICE).type(torch.bool)
     padding_mask = (data == PAD_TOKEN).all(dim=2).T
     pred = model(data, mask, padding_mask)
@@ -43,6 +29,10 @@ def make_prediction(model, data):
 
 
 def calc_accuracy(preds, labels):
+    '''
+    Calculate the accuracy of the model based on only the valid (i.e.
+    non-PAD_TOKEN) hits' classification.
+    '''
     y_true, y_pred = [], []
     for i, l in enumerate(labels):
         if not PAD_TOKEN in l:
@@ -53,6 +43,11 @@ def calc_accuracy(preds, labels):
 
 
 def train_epoch(model, optim, train_loader, loss_fn):
+    '''
+    Conducts a single epoch of training: prediction, loss calculation, and loss
+    backpropagation. Returns the average loss over the whole train data.
+    '''
+    # Get the network in train mode
     torch.set_grad_enabled(True)
     model.train()
     losses, accuracy = 0., 0.
@@ -61,12 +56,16 @@ def train_epoch(model, optim, train_loader, loss_fn):
     for _, data in t:
         _, x, _, track_labels = data
         optim.zero_grad()
+
+        # Make prediction
         pred = make_prediction(model, x)
+        # Calculate loss and use it to update weights
         loss = loss_fn(pred, track_labels)
         loss.backward()
         optim.step()
         losses += loss.item()
 
+        # Calculate the accuracy of predictions
         acc = calc_accuracy(pred.detach().numpy()[0], track_labels.numpy()[0])
         accuracy += acc/len(x)
         t.set_description("loss = %.8f, accuracy = %.8f" % (loss.item(), acc/len(x)))
@@ -75,6 +74,11 @@ def train_epoch(model, optim, train_loader, loss_fn):
 
 
 def evaluate(model, validation_loader, loss_fn):
+    '''
+    Evaluates the network on the validation data by making a prediction and
+    calculating the loss. Returns the average loss over the whole val data.
+    '''
+    # Get the network in evaluation mode
     model.eval()
     losses, accuracy = 0., 0.
     n_batches = int(math.ceil(len(validation_loader.dataset) / BATCH_SIZE))
@@ -82,21 +86,28 @@ def evaluate(model, validation_loader, loss_fn):
     with torch.no_grad():
         for _, data in t:
             _, x, _, track_labels = data
+
+            # Make prediction
             pred = make_prediction(model, x)
 
             # if i == 1:
             #     visualize_tracks(pred.detach().numpy()[0], "predicted")
                 # visualize_tracks(labels.detach().numpy()[0], "true")
 
+            # Calculate loss and accuracy
             loss = loss_fn(pred, track_labels)
-            losses += loss.item()
             acc = calc_accuracy(pred.detach().numpy()[0], track_labels.numpy()[0])
+            losses += loss.item()
             accuracy += acc/len(x)
 
     return losses / len(validation_loader), accuracy / len(validation_loader)
 
 
 def predict(model, test_loader):
+    '''
+    Evaluates the network on the test data. Returns the predictions
+    '''
+    # Get the network in evaluation mode
     torch.set_grad_enabled(False)
     model.eval()
     predictions = {}
@@ -105,8 +116,8 @@ def predict(model, test_loader):
     for i, data in t:
         event_id, x, _, _ = data
 
+        # Make a prediction and append it to the list
         pred = make_prediction(model, x)
-        # Append predictions to the list
         for i, e_id in enumerate(event_id):
             predictions[e_id] = pred[i]
     
@@ -138,7 +149,7 @@ if __name__ == '__main__':
     transformer = TransformerClassifier(num_encoder_layers=CL_NUM_ENCODER_LAYERS,
                                      d_model=CL_D_MODEL,
                                      n_head=CL_N_HEAD,
-                                     input_size=3,
+                                     input_size=DIM,
                                      output_size=MAX_NR_TRACKS,
                                      dim_feedforward=CL_DIM_FEEDFORWARD,
                                      dropout=CL_DROPOUT)
@@ -148,12 +159,15 @@ if __name__ == '__main__':
     loss_fn = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(transformer.parameters(), lr=CL_LEARNING_RATE)
 
+    # Training
     train_losses, val_losses = [], []
     min_val_loss = np.inf
     count = 0
 
     for epoch in range(NUM_EPOCHS):
+        # Train the model
         train_loss, train_accuracy = train_epoch(transformer, optimizer, train_loader, loss_fn)
+        # Evaluate on validation data
         val_loss, val_accuracy = evaluate(transformer, valid_loader, loss_fn)
         print((f"Epoch: {epoch}, "
                f"Val loss: {val_loss:.8f}, Train loss: {train_loss:.8f}, "
@@ -163,10 +177,12 @@ if __name__ == '__main__':
         val_losses.append(val_loss)
 
         if val_loss < min_val_loss:
+            # If the model has a new best validation loss, save it as "the best"
             min_val_loss = val_loss
             save_model(transformer, optimizer, "best", val_losses, train_losses, epoch, count)
             count = 0
         else:
+            # If the model's validation loss isn't better than the best, save it as "the last"
             save_model(transformer, optimizer, "last", val_losses, train_losses, epoch, count)
             count += 1
 
@@ -174,5 +190,6 @@ if __name__ == '__main__':
         #     print("Early stopping...")
         #     break
 
+    # Predict on the test data
     preds = predict(transformer, test_loader)
     print(preds)

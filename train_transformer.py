@@ -4,7 +4,6 @@ import pandas as pd
 import math
 import tqdm
 from torch.nn.functional import pad
-from timeit import default_timer as timer
 
 from dataset import HitsDataset 
 from transformer import TransformerModel, EarthMoverLoss
@@ -14,17 +13,6 @@ from visualization import visualize_tracks
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-
-def earth_mover_loss(y_pred, y_true):
-    # https://github.com/titu1994/neural-image-assessment/blob/master/train_mobilenet.py#L49
-    y_pred = y_pred / (torch.sum(y_pred, dim=-1, keepdim=True) + 1e-14)
-    y_true = y_true / (torch.sum(y_true, dim=-1, keepdim=True) + 1e-14)
-    # print(y_pred)
-    cdf_ytrue = torch.cumsum(y_true, axis=-1)
-    cdf_ypred = torch.cumsum(y_pred, axis=-1)
-    # print(cdf_ypred)
-    samplewise_emd = torch.sqrt(torch.mean(torch.square(torch.abs(cdf_ytrue - cdf_ypred)), axis=-1))
-    return torch.mean(samplewise_emd)
 
 def input_mask(data):
     '''
@@ -203,7 +191,7 @@ if __name__ == '__main__':
     transformer = transformer.to(DEVICE)
     pytorch_total_params = sum(p.numel() for p in transformer.parameters() if p.requires_grad)
     print("Total trainable params: {}".format(pytorch_total_params))
-    loss_fn = EarthMoverLoss() #torch.nn.MSELoss()  #torch.nn.KLDivLoss(reduction="batchmean")
+    loss_fn = EarthMoverLoss()
     optimizer = torch.optim.Adam(transformer.parameters(), lr=TR_LEARNING_RATE)
 
     # Training
@@ -239,4 +227,3 @@ if __name__ == '__main__':
     # Predict on the test data
     preds = predict(transformer, test_loader)
     print(preds)
-    # print(train_losses)

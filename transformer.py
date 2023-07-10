@@ -1,13 +1,12 @@
 """
-Transformer implementation.
-Taken from https://github.com/saulam/trajectory_fitting/tree/main
+Transformer implementation. Built on the implementation of Saul A. M.:
+https://github.com/saulam/trajectory_fitting/tree/main
 """
 import torch
-from torch import Tensor
 import torch.nn as nn
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from global_constants import DIM 
-import numpy as np
+from global_constants import DIM
+
 
 class EarthMoverLoss(nn.Module):
     def __init__(self):
@@ -33,7 +32,6 @@ class TransformerModel(nn.Module):
         self.decoder2 = nn.Linear(d_model, output_size)
         self.init_weights()
 
-
     def init_weights(self, init_range=0.1) -> None:
         self.input_layer.bias.data.zero_()
         self.input_layer.weight.data.uniform_(-init_range, init_range)
@@ -43,8 +41,7 @@ class TransformerModel(nn.Module):
             self.decoder2.bias.data.zero_()
             self.decoder2.weight.data.uniform_(-init_range, init_range)
 
-
-    def forward(self, input: Tensor, mask: Tensor, padding_mask: Tensor):
+    def forward(self, input, mask, padding_mask):
         src_emb = self.input_layer(input)
         memory = self.encoder(src=src_emb, mask=mask, src_key_padding_mask=padding_mask)
         memory = torch.mean(memory, dim=0)

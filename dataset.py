@@ -5,7 +5,14 @@ from torch.utils.data import Dataset
 
 from global_constants import *
 
-# def angle_sorting():
+
+def sort_by_angle_3d(coords):
+    if DIM == 2:
+        pythagorean = [coord[0]**2 + coord[1]**2 for coord in coords]
+    else: #dim==3
+        pythagorean = [coord[0]**2 + coord[1]**2 + coord[2]**2 for coord in coords]
+    _, indices = torch.sort(torch.tensor(pythagorean).float())
+    return indices
 
 
 class HitsDataset(Dataset):
@@ -99,6 +106,11 @@ class HitsDataset(Dataset):
                 data = data[indices]
                 track_classes = torch.tensor(track_classes).float()
                 track_classes = track_classes[indices]
+            if DIM == 3:
+                sorted_indices = sort_by_angle_3d(data)
+                data = data[sorted_indices] 
+                track_classes = torch.tensor(track_classes).float()
+                track_classes = track_classes[sorted_indices]
         
         del event
         return event_id, data, targets, track_classes

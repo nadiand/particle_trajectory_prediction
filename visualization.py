@@ -42,7 +42,7 @@ def visualize_hits(hits_df):
             else: #dim==3
                 plt.plot(row[i], row[i+1], row[i+2], marker=".", markerfacecolor="black", markeredgecolor="black")
     
-    plt.title("Visualization of a few events")
+    plt.title("Visualization of 5 events")
     plt.savefig('hits_visualized.png')
     plt.show()
 
@@ -77,15 +77,10 @@ def visualize_tracks(angles, type):
     ax = fig.add_subplot() if DIM == 2 else fig.add_subplot(projection='3d')
     plot_detectors(ax)
 
-    length = NR_DETECTORS+1 # TODO not sure if this is the best way, think it's not, see t1t2
     if DIM == 2:
         for angle in angles:
             x, y = np.cos(angle), np.sin(angle)
-            x = x+length if x > 0 else x-length
-            y = y+length if y > 0 else y-length
-            #TODO try with the t1,t2 parameters of line ! 
-            # https://scikit-spatial.readthedocs.io/en/stable/api_reference/Line/methods/skspatial.objects.Line.plot_2d.html#skspatial.objects.Line.plot_2d
-            line = Line([0,0], [x,y])
+            line = Line([0,0], [x*NR_DETECTORS, y*NR_DETECTORS])
             line.plot_2d(ax)
     else: #dim==3
         for angle, angle2 in angles:

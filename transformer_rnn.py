@@ -2,6 +2,7 @@ import torch
 import pandas as pd
 import math
 import tqdm
+import numpy as np
 
 from dataset import HitsDataset
 from classifier_transformer import TransformerClassifier
@@ -29,19 +30,17 @@ if __name__ == '__main__':
                                      dim_feedforward=CL_DIM_FEEDFORWARD,
                                      dropout=CL_DROPOUT)
     transformer = transformer.to(DEVICE)
-    transformer.eval()
-    optimizer = torch.optim.Adam(transformer.parameters(), lr=CL_LEARNING_RATE)
     
     checkpoint = torch.load("transformer_classifier_best")
     transformer.load_state_dict(checkpoint['model_state_dict'])
-    # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    transformer.eval()
 
     rnn = RNNModel(DIM, HIDDEN_SIZE_RNN, OUTPUT_SIZE_RNN)
     rnn = rnn.to(DEVICE)
-    rnn_optimizer = torch.optim.Adam(transformer.parameters(), lr=RNN_LEARNING_RATE)
 
     checkpoint = torch.load("rnn_best")
-    transformer.load_state_dict(checkpoint['model_state_dict'])
+    rnn.load_state_dict(checkpoint['model_state_dict'])
+    rnn.eval()
     # rnn_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     predictions = {}
@@ -51,8 +50,38 @@ if __name__ == '__main__':
     for i, data in t:
         event_id, x, labels, track_labels = data
         group = make_prediction(transformer, x)
-        accuracies.append(calc_accuracy(group, track_labels))
-        pred = predict_angle(rnn, group)
+        group = group.detach().numpy()[0]
+        accuracies.append(calc_accuracy(group, track_labels.numpy()[0]))
+
+        cluster_IDs = np.argmax(group, axis=1)
+        mask = []
+        for row in x[0]:
+            mask.append(not PAD_TOKEN in row)
+        cluster_IDs = cluster_IDs[mask]
+
+        x_list, tracks_list = [], []
+        for i, xx in enumerate(x[0]):
+            if not PAD_TOKEN in xx:
+                x_list.append(xx.tolist())
+
+        # Group hits together based on predicted cluster IDs
+        groups = {}
+        for i, lbl in enumerate(cluster_IDs):
+            if lbl not in groups.keys():
+                groups[lbl] = [x_list[i]]
+            else:
+                groups[lbl].append(x_list[i])
+        
+        # Prune the clusters so that they have at most NR_DETECTOR many hits
+        culled_groups = []
+        for group in groups.values():
+            if len(group) > NR_DETECTORS:
+                culled_groups.append(group[:NR_DETECTORS])
+            else:
+                culled_groups.append(group)
+
+        # feed 1 friup at a time
+        pred = predict_angle(rnn, culled_groups)
         predictions[event_id] = (pred,labels)
 
     avg_acc = sum(accuracies)/len(accuracies)

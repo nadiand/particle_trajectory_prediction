@@ -1,5 +1,18 @@
 import torch.nn as nn
+from global_constants import *
 
+
+class AsymmetricMSELoss(nn.Module):
+    def __init__(self):
+        super(AsymmetricMSELoss, self).__init__()
+
+    def forward(self, predicted_distribution, target_distribution):
+        e = predicted_distribution - target_distribution
+        se = e**2
+        weights = target_distribution*(MAX_NR_TRACKS-1)
+        ase = se * (weights+1) #+1 so we dont cancel out the 0s
+        amse = ase.mean(dim=1)
+        return amse.mean()
 
 class TransformerClassifier(nn.Module):
     '''
@@ -10,13 +23,12 @@ class TransformerClassifier(nn.Module):
     def __init__(self, num_encoder_layers, d_model, n_head, input_size, output_size, dim_feedforward, dropout):
         super(TransformerClassifier, self).__init__()
         self.input_layer = nn.Linear(input_size, d_model)
-        # add another linear layer, try which location is good TODO
         encoder_layers = nn.TransformerEncoderLayer(d_model, n_head, dim_feedforward, dropout)
         self.encoder = nn.TransformerEncoder(encoder_layers, num_encoder_layers)
         self.dropout = nn.Dropout(dropout)
         self.decoder = nn.Linear(d_model, output_size)
         self.softmax = nn.Softmax(dim=0)
-        self.init_weights()
+        # self.init_weights()
 
     def init_weights(self, init_range=0.1) -> None:
         self.input_layer.bias.data.zero_()

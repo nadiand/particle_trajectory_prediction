@@ -4,9 +4,10 @@ import pandas as pd
 import math
 import tqdm
 from sklearn.metrics import accuracy_score
+from timeit import default_timer as timer
 
 from dataset import HitsDataset 
-from classifier_transformer import TransformerClassifier
+from classifier_transformer import TransformerClassifier, AsymmetricMSELoss
 from global_constants import *
 from dataloader import get_dataloaders
 from visualization import visualize_tracks
@@ -33,12 +34,12 @@ def calc_accuracy(preds, labels):
     Calculate the accuracy of the model based on only the valid (i.e.
     non-PAD_TOKEN) hits' classification.
     '''
-    y_true, y_pred = [], []
-    for i, l in enumerate(labels):
-        if not PAD_TOKEN in l:
-            y_true.append(l.argmax())
-            y_pred.append(preds[i].argmax())
-    accuracy = accuracy_score(y_true, y_pred)
+    y_true = np.argmax(labels, axis=1)
+    y_pred = np.argmax(preds, axis=1)
+    mask = np.logical_not(np.any(labels == PAD_TOKEN, axis=1)) # TODO investigate
+    y_true_filtered = y_true[mask]
+    y_pred_filtered = y_pred[mask]
+    accuracy = np.mean(y_true_filtered == y_pred_filtered)
     return accuracy
 
 
@@ -60,7 +61,10 @@ def train_epoch(model, optim, train_loader, loss_fn):
         # Make prediction
         pred = make_prediction(model, x)
         # Calculate loss and use it to update weights
-        loss = loss_fn(pred, track_labels)
+        mask = np.logical_not(np.any(track_labels.detach().numpy()[0] == PAD_TOKEN, axis=1))
+        y_pred_filtered = pred.detach().numpy()[0][mask]
+        y_true_filtered = track_labels.detach().numpy()[0][mask]
+        loss = loss_fn(torch.tensor(y_pred_filtered, requires_grad=True).float(), torch.tensor(y_true_filtered, requires_grad=True).float())
         loss.backward()
         optim.step()
         losses += loss.item()
@@ -90,15 +94,15 @@ def evaluate(model, validation_loader, loss_fn):
             # Make prediction
             pred = make_prediction(model, x)
 
-            # if i == 1:
-            #     visualize_tracks(pred.detach().numpy()[0], "predicted")
-                # visualize_tracks(labels.detach().numpy()[0], "true")
-
             # Calculate loss and accuracy
-            loss = loss_fn(pred, track_labels)
+            mask = np.logical_not(np.any(track_labels.detach().numpy()[0] == PAD_TOKEN, axis=1))
+            y_pred_filtered = pred.detach().numpy()[0][mask]
+            y_true_filtered = track_labels.detach().numpy()[0][mask]
+            loss = loss_fn(torch.tensor(y_pred_filtered, requires_grad=True).float(), torch.tensor(y_true_filtered, requires_grad=True).float())
+        
             acc = calc_accuracy(pred.detach().numpy()[0], track_labels.numpy()[0])
             losses += loss.item()
-            accuracy += acc/len(x)
+            accuracy += acc
 
     return losses / len(validation_loader), accuracy / len(validation_loader)
 
@@ -156,7 +160,7 @@ if __name__ == '__main__':
     transformer = transformer.to(DEVICE)
     pytorch_total_params = sum(p.numel() for p in transformer.parameters() if p.requires_grad)
     print("Total trainable params: {}".format(pytorch_total_params))
-    loss_fn = torch.nn.MSELoss()
+    loss_fn = AsymmetricMSELoss() #torch.nn.MSELoss()
     optimizer = torch.optim.Adam(transformer.parameters(), lr=CL_LEARNING_RATE)
 
     # Training
@@ -192,4 +196,4 @@ if __name__ == '__main__':
 
     # Predict on the test data
     preds = predict(transformer, test_loader)
-    print(preds)
+    # print(preds)

@@ -1,16 +1,16 @@
 # Data
 DIM = 2 # the dimensionality of the data
 NR_DETECTORS = 5
-EVENTS = 5 #0000
-MAX_NR_TRACKS = 20 # 3 for the simple regressor and 20 for the biger challenge
+EVENTS = 500 #0000
+MAX_NR_TRACKS = 3 # change when changing the dataframe pahts !!!
 NOISE_STD = 0.1
-HITS_DATA_PATH = 'hits_dataframe.csv' #'C:/Users/lenovo/Desktop/uni/MLIPPA/Practical/particle_trajectory_prediction/hits_dataframe.csv'
-TRACKS_DATA_PATH = 'tracks_dataframe.csv' #'C:/Users/lenovo/Desktop/uni/MLIPPA/Practical/particle_trajectory_prediction/tracks_dataframe.csv'
+HITS_DATA_PATH = 'hits_dataframe_dataset1.csv' #'C:/Users/lenovo/Desktop/uni/MLIPPA/Practical/particle_trajectory_prediction/hits_dataframe.csv'
+TRACKS_DATA_PATH = 'tracks_dataframe_dataset1.csv' #'C:/Users/lenovo/Desktop/uni/MLIPPA/Practical/particle_trajectory_prediction/tracks_dataframe.csv'
 TEST_SPLIT = 0.2 # amount from the full dataset
 TRAIN_SPLIT = 0.9 # amount from the dataset left over after the test split is set aside
 
 # Training
-NUM_EPOCHS = 100
+NUM_EPOCHS = 10
 BATCH_SIZE = 256
 TEST_BATCH_SIZE = 1
 EARLY_STOPPING = 30
@@ -27,20 +27,22 @@ LEARNING_RATE_REGRESS = 1e-2
 
 # Direct transformer (Hits -> Trajectories) parameters
 TR_D_MODEL = 64
-TR_N_HEAD = 4
-TR_DIM_FEEDFORWARD = 32
-TR_NUM_ENCODER_LAYERS = 6
+TR_N_HEAD = 8
+TR_DIM_FEEDFORWARD = 64
+TR_NUM_ENCODER_LAYERS = 8
 TR_LEARNING_RATE = 1e-3
+TR_DROPOUT = 0.15
 
 # Classifying transformer (Hits -> Clusters) parameters
-CL_D_MODEL = 64
+CL_D_MODEL = 32
 CL_N_HEAD = 4
-CL_DIM_FEEDFORWARD = 32
-CL_NUM_ENCODER_LAYERS = 6
-CL_LEARNING_RATE = 1e-3
+CL_DIM_FEEDFORWARD = 64
+CL_NUM_ENCODER_LAYERS = 5
+CL_LEARNING_RATE = 1e-2
+CL_DROPOUT = 0.1
 
 # Regressor RNN (Clusters -> Trajectories) parameters
-HIDDEN_SIZE_RNN = 32
+HIDDEN_SIZE_RNN = 64
 OUTPUT_SIZE_RNN = 1
 MAX_CLUSTER_SIZE = 5
 RNN_LEARNING_RATE = 1e-3

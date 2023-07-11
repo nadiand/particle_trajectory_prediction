@@ -11,8 +11,10 @@ from trajectory_reconstruction import predict_angle
 from rnn_model import RNNModel
 from global_constants import *
 from dataloader import get_dataloaders
+from visualization import visualize_tracks
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 if __name__ == '__main__':
     torch.manual_seed(37)  # for reproducibility
@@ -30,18 +32,15 @@ if __name__ == '__main__':
                                      dim_feedforward=CL_DIM_FEEDFORWARD,
                                      dropout=CL_DROPOUT)
     transformer = transformer.to(DEVICE)
-    
     checkpoint = torch.load("transformer_classifier_best")
     transformer.load_state_dict(checkpoint['model_state_dict'])
     transformer.eval()
 
     rnn = RNNModel(DIM, HIDDEN_SIZE_RNN, OUTPUT_SIZE_RNN)
     rnn = rnn.to(DEVICE)
-
     checkpoint = torch.load("rnn_best")
     rnn.load_state_dict(checkpoint['model_state_dict'])
     rnn.eval()
-    # rnn_optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     predictions = {}
     accuracies = []
@@ -59,7 +58,7 @@ if __name__ == '__main__':
             mask.append(not PAD_TOKEN in row)
         cluster_IDs = cluster_IDs[mask]
 
-        x_list, tracks_list = [], []
+        x_list = []
         for i, xx in enumerate(x[0]):
             if not PAD_TOKEN in xx:
                 x_list.append(xx.tolist())
@@ -80,9 +79,13 @@ if __name__ == '__main__':
             else:
                 culled_groups.append(group)
 
-        # feed 1 friup at a time
         pred = predict_angle(rnn, culled_groups)
         predictions[event_id] = (pred,labels)
+        
+        labels = labels.detach().numpy()[0]
+        labels = labels[labels != PAD_TOKEN]
+        visualize_tracks(pred.detach().numpy(), "predicted")
+        visualize_tracks(labels, "true")
 
     avg_acc = sum(accuracies)/len(accuracies)
     print("The accuracy of the transformer per group:")

@@ -3,14 +3,12 @@ import numpy as np
 import pandas as pd
 import math
 import tqdm
-from sklearn.metrics import accuracy_score
-from timeit import default_timer as timer
 
 from dataset import HitsDataset 
 from classifier_transformer import TransformerClassifier, AsymmetricMSELoss
 from global_constants import *
 from dataloader import get_dataloaders
-from visualization import visualize_tracks
+from visualization import visualize_hits
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -144,9 +142,10 @@ if __name__ == '__main__':
     torch.manual_seed(37)  # for reproducibility
 
     # Load and split dataset into training, validation and test sets
-    hits = pd.read_csv(HITS_DATA_PATH, header=None)
-    tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
+    hits = pd.read_csv("hits_dataframe_dataset2.csv", header=None)
+    tracks = pd.read_csv("tracks_dataframe_dataset2.csv", header=None)
     dataset = HitsDataset(hits, True, tracks, shuffle=False, sort_data=True)
+
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
 
     # Transformer model

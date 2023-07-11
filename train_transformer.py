@@ -95,9 +95,6 @@ def train_epoch(model, optim, train_loader, loss_fn):
         labels = prep_labels(labels)
         # Calculate loss and use it to update weights
         loss = loss_fn(pred, labels)
-        # loss = earth_mover_distance(labels, pred)
-        # loss = earth_mover_loss(pred, labels)
-        # loss = chamfer_distance(pred.detach().numpy(), labels.detach().numpy())
         loss.backward() 
         optim.step()
         t.set_description("loss = %.8f" % loss.item())
@@ -126,16 +123,6 @@ def evaluate(model, validation_loader, loss_fn):
             labels = prep_labels(labels)
             # Calculate loss
             loss = loss_fn(pred, labels)
-
-            # if i == 1:
-            #     print(pred[0], labels[0])
-            #     visualize_tracks(pred.detach().numpy()[0], "predicted")
-            #     visualize_tracks(labels.detach().numpy()[0], "true")
-            #     exit()
-
-            # loss = earth_mover_distance(labels, pred)
-            # loss = earth_mover_loss(pred, labels)
-            # loss = chamfer_distance(pred.detach().numpy(), labels.detach().numpy())
             losses += loss.item()
 
     return losses / len(validation_loader)

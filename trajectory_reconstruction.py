@@ -35,7 +35,16 @@ def predict_angle(rnn, clusters):
         # Pad the clusters with pseudo hits
         padded_clusters.append(torch.cat((cluster,padding),0))
     padded_clusters = torch.stack(padded_clusters)
-
+    # len_pad = len(padded_clusters)
+    # if len_pad < 20:
+    #     extras = []
+    #     while len_pad < 20:
+    #         lens.append(1)
+    #         copy_cl = torch.tensor([[PAD_TOKEN, PAD_TOKEN, PAD_TOKEN],[PAD_TOKEN, PAD_TOKEN, PAD_TOKEN],[PAD_TOKEN, PAD_TOKEN, PAD_TOKEN],[PAD_TOKEN, PAD_TOKEN, PAD_TOKEN],[PAD_TOKEN, PAD_TOKEN, PAD_TOKEN]])
+    #         extras.append(torch.tensor(copy_cl).float())
+    #         len_pad += 1
+    #     extras = torch.stack(extras)
+    #     padded_clusters = torch.cat((padded_clusters, extras))
     # Make a prediction and return it
     pred = rnn(torch.tensor(padded_clusters).float(), torch.tensor(lens).int())
     return pred if DIM == 2 else torch.stack((pred[0],pred[1]),dim=1)
@@ -58,6 +67,10 @@ def train(rnn, optim, train_loader, loss_fn):
         optim.zero_grad()
         # Make prediction
         pred = predict_angle(rnn, group)
+        # Mask the predictions and labels to ignore padded values during loss calculation
+        mask = [not PAD_TOKEN in l for l in label]
+        pred = pred[mask]
+        label = label[mask]
         # Calculate loss and use it to update weights
         loss = loss_fn(pred, label)
         loss.backward()
@@ -84,6 +97,10 @@ def evaluation(rnn, val_loader, loss_fn):
 
             # Make prediction
             pred = predict_angle(rnn, group)
+            # Mask predictions and labels to ignore padded values during loss calculation
+            mask = [not PAD_TOKEN in l for l in label]
+            pred = pred[mask]
+            label = label[mask]
             # Calculate loss
             loss = loss_fn(pred, label)
             losses += loss.item()
@@ -119,7 +136,7 @@ def save_model(model, optim, type, val_losses, train_losses, epoch, count):
         'train_losses': train_losses,
         'val_losses': val_losses,
         'count': count,
-    }, "rnn_"+type)
+    }, "rnn_dataset3_"+type)
 
 
 if __name__ == '__main__':
@@ -141,7 +158,7 @@ if __name__ == '__main__':
     train_losses, val_losses = [], []
     min_val_loss = np.inf
     count = 0
-    for epoch in range(NUM_EPOCHS):
+    for epoch in range(100):#NUM_EPOCHS):
         # Train the model
         train_loss = train(rnn, optim, train_loader, loss_fn)
         # Evaluate on validation data
@@ -154,71 +171,17 @@ if __name__ == '__main__':
         if val_loss < min_val_loss:
             # If the model has a new best validation loss, save it as "the best"
             min_val_loss = val_loss
-            save_model(rnn, optim, "best", val_losses, train_losses, epoch, count)
+            save_model(rnn, optim, "best_new", val_losses, train_losses, epoch, count)
             count = 0
         else:
             # If the model's validation loss isn't better than the best, save it as "the last"
             save_model(rnn, optim, "last", val_losses, train_losses, epoch, count)
             count += 1
 
-        # if count >= EARLY_STOPPING:
-        #     print("Early stopping...")
-        #     break
+        if count >= EARLY_STOPPING:
+            print("Early stopping...")
+            break
     
     # Predict on the test data
-    # print(prediction(rnn, test_loader))
-
-
-    # transformer = TransformerClassifier(num_encoder_layers=NUM_ENCODER_LAYERS,
-    #                                  d_model=D_MODEL,
-    #                                  n_head=N_HEAD,
-    #                                  input_size=INPUT_SIZE,
-    #                                  output_size=OUTPUT_SIZE,
-    #                                  dim_feedforward=DIM_FEEDFORWARD)
-    # transformer = transformer.to(DEVICE)
-    # transformer.eval()
-    # optimizer = torch.optim.Adam(transformer.parameters(), lr=LEARNING_RATE)
-    
-    # checkpoint = torch.load("transformer_encoder_best")
-    # transformer.load_state_dict(checkpoint['model_state_dict'])
-    # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    # epoch = checkpoint['epoch'] + 1
-    # train_losses = checkpoint['train_losses']
-    # val_losses = checkpoint['val_losses']
-    # min_val_loss = min(val_losses)
-    # count = checkpoint['count']
-
-    # torch.set_grad_enabled(True)
-    # rnn.train()
-    # losses = 0.
-    # n_batches = int(math.ceil(len(train_loader.dataset) / BATCH_SIZE))
-    # t = tqdm.tqdm(enumerate(train_loader), total=n_batches, disable=False)
-    # for i, data in t:
-    #     event_id, x, labels, track_labels, real_lens = data
-    #     x = x.to(DEVICE)
-
-    #     preds = make_prediction(transformer, x, real_lens)
-    #     groups = {}
-    #     for i, pred in enumerate(preds):
-    #         class_id = pred.argmax()
-    #         if class_id in groups.keys():
-    #             indices = groups[class_id]
-    #             groups[class_id] = indices.append(i)
-    #         else:
-    #             groups[class_id] = [i]
-
-    #     data = []
-    #     x = x.detach().numpy()
-    #     for key in groups.keys():
-    #         indices = groups[key]
-    #         data.append([x[i] for i in indices])
-
-    #     print(data)
-    #     optim.zero_grad()
-    #     pred = rnn(torch.tensor(np.array(data)).float())
-    #     loss = loss_fn(pred, labels)
-    #     loss.backward()  # compute gradients
-    #     optim.step()  # backprop
-    #     losses += loss.item()
-    #     t.set_description("loss = %.8f" % loss.item())
-
+    preds = prediction(rnn, test_loader)
+    print(preds)

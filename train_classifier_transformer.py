@@ -8,7 +8,6 @@ from dataset import HitsDataset
 from classifier_transformer import TransformerClassifier, AsymmetricMSELoss
 from global_constants import *
 from dataloader import get_dataloaders
-from visualization import visualize_hits
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -58,10 +57,11 @@ def train_epoch(model, optim, train_loader, loss_fn):
 
         # Make prediction
         pred = make_prediction(model, x)
-        # Calculate loss and use it to update weights
+        # Mask the predictions and labels to ignore padded values during loss calculation
         mask = np.logical_not(np.any(track_labels.detach().numpy()[0] == PAD_TOKEN, axis=1))
         y_pred_filtered = pred.detach().numpy()[0][mask]
         y_true_filtered = track_labels.detach().numpy()[0][mask]
+        # Calculate loss and use it to update weights
         loss = loss_fn(torch.tensor(y_pred_filtered, requires_grad=True).float(), torch.tensor(y_true_filtered, requires_grad=True).float())
         loss.backward()
         optim.step()
@@ -91,13 +91,12 @@ def evaluate(model, validation_loader, loss_fn):
 
             # Make prediction
             pred = make_prediction(model, x)
-
-            # Calculate loss and accuracy
+            # Mask the predictions and labels to ignore padded values during loss calculation
             mask = np.logical_not(np.any(track_labels.detach().numpy()[0] == PAD_TOKEN, axis=1))
             y_pred_filtered = pred.detach().numpy()[0][mask]
             y_true_filtered = track_labels.detach().numpy()[0][mask]
+            # Calculate loss and accuracy
             loss = loss_fn(torch.tensor(y_pred_filtered, requires_grad=True).float(), torch.tensor(y_true_filtered, requires_grad=True).float())
-        
             acc = calc_accuracy(pred.detach().numpy()[0], track_labels.numpy()[0])
             losses += loss.item()
             accuracy += acc
@@ -142,8 +141,8 @@ if __name__ == '__main__':
     torch.manual_seed(37)  # for reproducibility
 
     # Load and split dataset into training, validation and test sets
-    hits = pd.read_csv("hits_dataframe_dataset2.csv", header=None)
-    tracks = pd.read_csv("tracks_dataframe_dataset2.csv", header=None)
+    hits = pd.read_csv(HITS_DATA_PATH, header=None)
+    tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
     dataset = HitsDataset(hits, True, tracks, shuffle=False, sort_data=True)
 
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
@@ -159,7 +158,7 @@ if __name__ == '__main__':
     transformer = transformer.to(DEVICE)
     pytorch_total_params = sum(p.numel() for p in transformer.parameters() if p.requires_grad)
     print("Total trainable params: {}".format(pytorch_total_params))
-    loss_fn = AsymmetricMSELoss() #torch.nn.MSELoss()
+    loss_fn = AsymmetricMSELoss()
     optimizer = torch.optim.Adam(transformer.parameters(), lr=CL_LEARNING_RATE)
 
     # Training
@@ -167,7 +166,7 @@ if __name__ == '__main__':
     min_val_loss = np.inf
     count = 0
 
-    for epoch in range(NUM_EPOCHS):
+    for epoch in range(10):#NUM_EPOCHS):
         # Train the model
         train_loss, train_accuracy = train_epoch(transformer, optimizer, train_loader, loss_fn)
         # Evaluate on validation data
@@ -189,10 +188,10 @@ if __name__ == '__main__':
             save_model(transformer, optimizer, "last", val_losses, train_losses, epoch, count)
             count += 1
 
-        # if count >= EARLY_STOPPING:
-        #     print("Early stopping...")
-        #     break
+        if count >= EARLY_STOPPING:
+            print("Early stopping...")
+            break
 
     # Predict on the test data
     preds = predict(transformer, test_loader)
-    # print(preds)
+    print(preds)

@@ -3,74 +3,22 @@ import numpy as np
 import pandas as pd
 import math
 import tqdm
-from torch.nn.functional import pad
 
 from dataset import HitsDataset 
 from transformer import TransformerModel, EarthMoverLoss
 from global_constants import *
 from dataloader import get_dataloaders
-from visualization import visualize_tracks
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def input_mask(data):
-    '''
-    Create the input mask and input padding mask for the transformer.
-    '''
-    sequence_len = data.shape[0]
-    padding_vector = torch.full((sequence_len,), PAD_TOKEN)
-    mask = torch.zeros((sequence_len, sequence_len), device=DEVICE).type(torch.bool)
-    padding_mask = (data.transpose(0, 2) == padding_vector).all(dim=0)
-    return mask, padding_mask
-
-
-def prediction_mask(preds, indices):
-    '''
-    Create the prediction mask, which masks all predictions for padded coordinates.
-    '''
-    indices_arr = np.array(indices)
-    mask = torch.ones(preds.shape)
-    for i, length in enumerate(indices_arr):
-        mask[i][int(length):] = False
-    return mask
-
-
-def prep_labels(labels):
-    '''
-    Pad the labels to the maximum amount there can be (MAX_NR_TRACKS) so that they
-    can be comared to the predictions, and mask the padded values.
-    '''
-    labels = labels.to(DEVICE)
-    labels = pad(labels, (0,(MAX_NR_TRACKS-labels.shape[1])), "constant", PAD_TOKEN)
-    label_mask = (labels != PAD_TOKEN).float()
-    labels = labels * label_mask
-    return labels
-
-
 def make_prediction(model, data):
-    lengths = []
-    for batch in data:
-        lengths.append(sum([1 for point in batch if not PAD_TOKEN in point]))
-    padding_len = np.round(np.divide(lengths, NR_DETECTORS))
-
+    '''
+    Transposes the data matrix and feed it into the model. Returns the prediction.
+    '''
     data = data.to(DEVICE)
-    data = data.transpose(0,1) # TODO might be different for 3d
-    mask, padding_mask = input_mask(data)
-    pred = model(data, mask, padding_mask)
-
-    if DIM == 2:
-        pred_mask = prediction_mask(pred, padding_len)
-        pred = pred * torch.tensor(pred_mask).float()
-    else: #dim==3
-        # TODO try this out
-        pred = pred[0].transpose(0, 1), pred[1].transpose(0, 1)
-        pred = torch.stack([pred[0], pred[1]])
-        for i in range(pred.shape[0]):
-            slice_mask = prediction_mask(pred[i, :, :], padding_len)
-            pred[i, :, :] = pred[i, :, :] * torch.tensor(slice_mask).float()
-        pred = pred.transpose(0, 2)
-        pred = pred.transpose(1, 0)
+    data = data.transpose(0,1)
+    pred = model(data)
     return pred
 
 
@@ -91,8 +39,6 @@ def train_epoch(model, optim, train_loader, loss_fn):
         optim.zero_grad()
         # Make prediction
         pred = make_prediction(model, x)
-        # Pad and mask labels
-        labels = prep_labels(labels)
         # Calculate loss and use it to update weights
         loss = loss_fn(pred, labels)
         loss.backward() 
@@ -119,8 +65,6 @@ def evaluate(model, validation_loader, loss_fn):
 
             # Make prediction
             pred = make_prediction(model, x)
-            # Pad and mask labels
-            labels = prep_labels(labels)
             # Calculate loss
             loss = loss_fn(pred, labels)
             losses += loss.item()
@@ -165,8 +109,8 @@ if __name__ == '__main__':
     torch.manual_seed(37)  # for reproducibility
 
     # Load and split dataset into training, validation and test sets
-    hits = pd.read_csv("hits_dataframe_dataset1.csv", header=None)
-    tracks = pd.read_csv("tracks_dataframe_dataset1.csv", header=None)
+    hits = pd.read_csv(HITS_DATA_PATH, header=None)
+    tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
     dataset = HitsDataset(hits, True, tracks)
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
 
@@ -189,7 +133,7 @@ if __name__ == '__main__':
     min_val_loss = np.inf
     epoch, count = 0, 0
 
-    for epoch in range(200):#NUM_EPOCHS):
+    for epoch in range(NUM_EPOCHS):
         # Train the model
         train_loss = train_epoch(transformer, optimizer, train_loader, loss_fn)
         # Evaluate on validation data
@@ -202,7 +146,7 @@ if __name__ == '__main__':
         if validation_loss < min_val_loss:
             # If the model has a new best validation loss, save it as "the best"
             min_val_loss = validation_loss
-            save_model(transformer, optimizer, "best", val_losses, train_losses, epoch, count)
+            save_model(transformer, optimizer, "best_new", val_losses, train_losses, epoch, count)
             count = 0
         else:
             # If the model's validation loss isn't better than the best, save it as "the last"
@@ -210,9 +154,9 @@ if __name__ == '__main__':
             count += 1
 
         # If the model hasn't improved in a while, stop the training
-        # if count >= EARLY_STOPPING:
-        #     print("Early stopping...")
-        #     break
+        if count >= EARLY_STOPPING:
+            print("Early stopping...")
+            break
 
     # Predict on the test data
     preds = predict(transformer, test_loader)

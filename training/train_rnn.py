@@ -6,7 +6,7 @@ import math
 import tqdm
 
 from groups_dataset import GroupsDataset
-from rnn_model import RNNModel
+from model_structures.rnn_model import RNNModel
 from dataloader import get_dataloaders
 from global_constants import *
 
@@ -126,7 +126,7 @@ def save_model(model, optim, type, val_losses, train_losses, epoch, count):
         'train_losses': train_losses,
         'val_losses': val_losses,
         'count': count,
-    }, "rnn_dataset3_"+type)
+    }, "best_models/rnn_dataset3_"+type)
 
 
 if __name__ == '__main__':

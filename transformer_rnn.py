@@ -3,10 +3,10 @@ import pandas as pd
 import numpy as np
 
 from dataset import HitsDataset
-from classifier_transformer import TransformerClassifier
-from train_classifier_transformer import make_prediction, calc_accuracy
-from trajectory_reconstruction import predict_angle
-from rnn_model import RNNModel
+from model_structures.classifier_transformer import TransformerClassifier
+from training.train_classifier_transformer import make_prediction, calc_accuracy
+from training.train_rnn import predict_angle
+from model_structures.rnn_model import RNNModel
 from global_constants import *
 from dataloader import get_dataloaders
 from visualization import visualize_tracks
@@ -32,21 +32,21 @@ if __name__ == '__main__':
                                      dim_feedforward=CL_DIM_FEEDFORWARD,
                                      dropout=CL_DROPOUT)
     transformer = transformer.to(DEVICE)
-    checkpoint = torch.load("transformer_classifier_best")
+    checkpoint = torch.load("best_models/transformer_classifier_best")
     transformer.load_state_dict(checkpoint['model_state_dict'])
     transformer.eval()
 
     # Load best saved trained RNN model
     rnn = RNNModel(DIM, HIDDEN_SIZE_RNN, OUTPUT_SIZE_RNN)
     rnn = rnn.to(DEVICE)
-    checkpoint = torch.load("rnn_best")
+    checkpoint = torch.load("best_models/rnn_best")
     rnn.load_state_dict(checkpoint['model_state_dict'])
     rnn.eval()
 
     # Predicting
     predictions = {}
     accuracies = []
-    for _, data in test_loader:
+    for data in test_loader:
         event_id, x, labels, track_labels = data
         # Group hits into clusters with transformer
         cluster_predictions = make_prediction(transformer, x)

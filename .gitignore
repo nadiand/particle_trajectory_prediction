@@ -1,6 +1,5 @@
 *.png
-*.csv
-*_best
-*_last
-*.pkl
 __pycache__/
+training/__pycache__/
+data/
+model_structures/__pycache__/

@@ -5,7 +5,7 @@ import math
 import tqdm
 
 from dataset import HitsDataset
-from regressor_model import RegressionModel
+from model_structures.regressor_model import RegressionModel
 from dataloader import get_dataloaders
 from global_constants import *
 
@@ -93,7 +93,7 @@ def save_model(model, optim, type, val_losses, train_losses, epoch, count):
         'train_losses': train_losses,
         'val_losses': val_losses,
         'count': count,
-    }, "regressor_"+type)
+    }, "best_models/regressor_"+type)
 
 
 if __name__ == '__main__':

@@ -4,7 +4,8 @@ import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 import torch
 
-from trajectory_reconstruction import RNNModel, predict_angle
+from model_structures.rnn_model import RNNModel
+from training.train_rnn import predict_angle
 from dataset import HitsDataset
 from visualization import visualize_tracks
 from dataloader import get_dataloaders
@@ -64,7 +65,7 @@ if __name__ == '__main__':
     rnn = RNNModel(DIM, HIDDEN_SIZE_RNN, OUTPUT_SIZE_RNN)
     optim = torch.optim.Adam(rnn.parameters(), lr=TR_LEARNING_RATE)
 
-    checkpoint = torch.load("rnn_best")
+    checkpoint = torch.load("best_models/rnn_best")
     rnn.load_state_dict(checkpoint['model_state_dict'])
     optim.load_state_dict(checkpoint['optimizer_state_dict'])
 

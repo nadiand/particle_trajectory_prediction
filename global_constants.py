@@ -1,11 +1,11 @@
 # Data
-DIM = 3 # the dimensionality of the data
+DIM = 2 # the dimensionality of the data
 NR_DETECTORS = 5
 EVENTS = 50000
-MAX_NR_TRACKS = 20
+MAX_NR_TRACKS = 3
 NOISE_STD = 0.1
-HITS_DATA_PATH = 'hits_dataframe_dataset3.csv'
-TRACKS_DATA_PATH = 'tracks_dataframe_dataset3.csv'
+HITS_DATA_PATH = 'data/hits_dataframe_dataset1.csv'
+TRACKS_DATA_PATH = 'data/tracks_dataframe_dataset1.csv'
 TEST_SPLIT = 0.2 # amount from the full dataset
 TRAIN_SPLIT = 0.9 # amount from the dataset left over after the test split is set aside
 

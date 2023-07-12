@@ -30,8 +30,9 @@ def generation():
     for _ in range(EVENTS):
         hit_entry = []
         track_entry = []
-        # nr_tracks = np.random.randint(1, MAX_NR_TRACKS+1)
-        nr_tracks = 3
+        # Each event has a random number of generated particles
+        nr_tracks = np.random.randint(1, MAX_NR_TRACKS+1)
+        # nr_tracks = MAX_NR_TRACKS
         for t in range(nr_tracks):
             # Get a random angle for the trajectory and decide its direction
             line_direction = np.random.randint(2, size=1)[0]

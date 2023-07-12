@@ -6,15 +6,6 @@ from torch.utils.data import Dataset
 from global_constants import *
 
 
-def sort_by_angle_3d(coords):
-    if DIM == 2:
-        pythagorean = [coord[0]**2 + coord[1]**2 for coord in coords]
-    else: #dim==3
-        pythagorean = [coord[0]**2 + coord[1]**2 + coord[2]**2 for coord in coords]
-    _, indices = torch.sort(torch.tensor(pythagorean).float())
-    return indices
-
-
 class HitsDataset(Dataset):
     '''
     A dataset for the hits with rows corresponding to the number of events, and 
@@ -34,6 +25,7 @@ class HitsDataset(Dataset):
     def __init__(self, data, train=True, labels=None, shuffle=True, sort_data=False, sort_targets=False):
         if shuffle and sort_data:
             raise Exception("Only one out of sort and shuffle can be True at a time!")
+        
         self.data = data.fillna(value=PAD_TOKEN)
         self.train = train
         self.targets = labels
@@ -76,10 +68,10 @@ class HitsDataset(Dataset):
                 for i in range(0, len(track_params), DIM):
                     targets.append((track_params[i], track_params[i+1]))
             if self.sort_targets:
-                targets = np.sort(targets) #TODO how does this work for 3d data?
+                targets = np.sort(targets)
             targets = torch.tensor(targets).float()
         
-            # Also obtain the track ("class") each hit belongs to
+            # Obtain the track ("class") each hit belongs to
             track_classes = []
             for i, coord in enumerate(x):
                 if coord != PAD_TOKEN:
@@ -101,16 +93,16 @@ class HitsDataset(Dataset):
         # Sort data (and corresponding classes) if specified
         if self.sort_data:
             if DIM == 2:
-                angles = [math.asin(d[0]/math.sqrt(d[0]**2 + d[1]**2)) for d in data]
+                # Sort the data by angle
+                angles = [math.asin(coord[0]/math.sqrt(coord[0]**2 + coord[1]**2)) for coord in data]
                 _, indices = torch.sort(torch.tensor(angles).float())
-                data = data[indices]
-                track_classes = torch.tensor(track_classes).float()
-                track_classes = track_classes[indices]
             if DIM == 3:
-                sorted_indices = sort_by_angle_3d(data)
-                data = data[sorted_indices] 
-                track_classes = torch.tensor(track_classes).float()
-                track_classes = track_classes[sorted_indices]
+                # Sort the data by distance from the origin
+                pythagorean = [coord[0]**2 + coord[1]**2 + coord[2]**2 for coord in data]
+                _, indices = torch.sort(torch.tensor(pythagorean).float())
+            data = data[indices] 
+            track_classes = torch.tensor(track_classes).float()
+            track_classes = track_classes[indices]
         
         del event
         return event_id, data, targets, track_classes

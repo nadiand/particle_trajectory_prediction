@@ -5,8 +5,8 @@ import math
 import tqdm
 
 from dataset import HitsDataset
-from dataloader import get_dataloaders
 from regressor_model import RegressionModel
+from dataloader import get_dataloaders
 from global_constants import *
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -100,8 +100,8 @@ if __name__ == '__main__':
     torch.manual_seed(37)  # for reproducibility
 
     # Load and split dataset into training, validation and test sets
-    hits = pd.read_csv("hits_dataframe_dataset1.csv", header=None)
-    tracks = pd.read_csv("tracks_dataframe_dataset1.csv", header=None)
+    hits = pd.read_csv(HITS_DATA_PATH, header=None)
+    tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
     dataset = HitsDataset(hits, True, tracks, sort_targets=True)
     train_loader, valid_loader, test_loader = get_dataloaders(dataset)
 
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     min_val_loss = np.inf
     train_losses, val_losses = [], []
     count = 0
-    for epoch in range(500):#NUM_EPOCHS):
+    for epoch in range(NUM_EPOCHS):
         # Train the model
         train_loss = train(regressor, train_loader, loss_fn)
         # Evaluate on validation data
@@ -138,10 +138,10 @@ if __name__ == '__main__':
             count += 1
 
         # If the model hasn't improved in a while, stop the training
-        # if count >= EARLY_STOPPING:
-        #     print("Early stopping...")
-        #     break
+        if count >= EARLY_STOPPING:
+            print("Early stopping...")
+            break
 
     # Predict on the test data
     preds = predict(regressor, test_loader)
-    # print(preds)
+    print(preds)

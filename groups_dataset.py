@@ -59,7 +59,8 @@ class GroupsDataset(Dataset):
             for i in range(self.total_events):
                 # Get a row from the track dataframe
                 track_param = self.targets.iloc[i].values.flatten().tolist()
-                # Grab all target params up until the padded values
+
+                # Grab all target params that are not padded values
                 if DIM == 2:
                     for i in range(0, len(track_param), DIM):
                         if track_param[i] == PAD_TOKEN:
@@ -76,7 +77,7 @@ class GroupsDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # Get a row and transform it into a TODO what do the rows look like and also for targets ???
+        # Get a row of the data and convert it to tensor
         row = self.data[idx]
         data = torch.tensor(row).float()
 

@@ -1,4 +1,5 @@
 import torch.nn as nn
+
 from global_constants import *
 
 
@@ -38,7 +39,7 @@ class TransformerClassifier(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.decoder = nn.Linear(d_model, output_size)
         self.softmax = nn.Softmax(dim=0)
-        # self.init_weights()
+        self.init_weights()
 
     def init_weights(self, init_range=0.1) -> None:
         self.input_layer.bias.data.zero_()

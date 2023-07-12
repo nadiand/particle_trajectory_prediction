@@ -6,8 +6,8 @@ import tqdm
 
 from dataset import HitsDataset 
 from transformer import TransformerModel, EarthMoverLoss
-from global_constants import *
 from dataloader import get_dataloaders
+from global_constants import *
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

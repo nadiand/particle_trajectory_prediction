@@ -35,17 +35,7 @@ def predict_angle(rnn, clusters):
         # Pad the clusters with pseudo hits
         padded_clusters.append(torch.cat((cluster,padding),0))
     padded_clusters = torch.stack(padded_clusters)
-    # len_pad = len(padded_clusters)
-    # if len_pad < 20:
-    #     extras = []
-    #     while len_pad < 20:
-    #         lens.append(1)
-    #         copy_cl = torch.tensor([[PAD_TOKEN, PAD_TOKEN, PAD_TOKEN],[PAD_TOKEN, PAD_TOKEN, PAD_TOKEN],[PAD_TOKEN, PAD_TOKEN, PAD_TOKEN],[PAD_TOKEN, PAD_TOKEN, PAD_TOKEN],[PAD_TOKEN, PAD_TOKEN, PAD_TOKEN]])
-    #         extras.append(torch.tensor(copy_cl).float())
-    #         len_pad += 1
-    #     extras = torch.stack(extras)
-    #     padded_clusters = torch.cat((padded_clusters, extras))
-    # Make a prediction and return it
+
     pred = rnn(torch.tensor(padded_clusters).float(), torch.tensor(lens).int())
     return pred if DIM == 2 else torch.stack((pred[0],pred[1]),dim=1)
 
@@ -158,7 +148,7 @@ if __name__ == '__main__':
     train_losses, val_losses = [], []
     min_val_loss = np.inf
     count = 0
-    for epoch in range(100):#NUM_EPOCHS):
+    for epoch in range(NUM_EPOCHS):
         # Train the model
         train_loss = train(rnn, optim, train_loader, loss_fn)
         # Evaluate on validation data

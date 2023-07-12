@@ -1,7 +1,5 @@
 import torch
 import pandas as pd
-import math
-import tqdm
 import numpy as np
 
 from dataset import HitsDataset
@@ -19,11 +17,13 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 if __name__ == '__main__':
     torch.manual_seed(37)  # for reproducibility
 
+    # Load the dataset
     hits = pd.read_csv(HITS_DATA_PATH, header=None)
     tracks = pd.read_csv(TRACKS_DATA_PATH, header=None)
     dataset = HitsDataset(hits, True, tracks)
     _, _, test_loader = get_dataloaders(dataset)
 
+    # Load best saved trained transformer model
     transformer = TransformerClassifier(num_encoder_layers=CL_NUM_ENCODER_LAYERS,
                                      d_model=CL_D_MODEL,
                                      n_head=CL_N_HEAD,
@@ -36,28 +36,32 @@ if __name__ == '__main__':
     transformer.load_state_dict(checkpoint['model_state_dict'])
     transformer.eval()
 
+    # Load best saved trained RNN model
     rnn = RNNModel(DIM, HIDDEN_SIZE_RNN, OUTPUT_SIZE_RNN)
     rnn = rnn.to(DEVICE)
     checkpoint = torch.load("rnn_best")
     rnn.load_state_dict(checkpoint['model_state_dict'])
     rnn.eval()
 
+    # Predicting
     predictions = {}
     accuracies = []
-    n_batches = int(math.ceil(len(test_loader.dataset) / BATCH_SIZE))
-    t = tqdm.tqdm(enumerate(test_loader), total=n_batches, disable=False)
-    for i, data in t:
+    for _, data in test_loader:
         event_id, x, labels, track_labels = data
-        group = make_prediction(transformer, x)
-        group = group.detach().numpy()[0]
-        accuracies.append(calc_accuracy(group, track_labels.numpy()[0]))
+        # Group hits into clusters with transformer
+        cluster_predictions = make_prediction(transformer, x)
+        cluster_predictions = cluster_predictions.detach().numpy()[0]
+        # Calculate the accuracy of the classifications
+        accuracies.append(calc_accuracy(cluster_predictions, track_labels.numpy()[0]))
 
-        cluster_IDs = np.argmax(group, axis=1)
+        # Get the actual cluster IDs and ignore the predictions for padded hits
+        cluster_IDs = np.argmax(cluster_predictions, axis=1)
         mask = []
         for row in x[0]:
             mask.append(not PAD_TOKEN in row)
         cluster_IDs = cluster_IDs[mask]
 
+        # Convert x into a list, ignoring the padded values
         x_list = []
         for i, xx in enumerate(x[0]):
             if not PAD_TOKEN in xx:
@@ -73,23 +77,20 @@ if __name__ == '__main__':
         
         # Prune the clusters so that they have at most NR_DETECTOR many hits
         culled_groups = []
-        for group in groups.values():
-            if len(group) > NR_DETECTORS:
-                culled_groups.append(group[:NR_DETECTORS])
+        for cluster_predictions in groups.values():
+            if len(cluster_predictions) > NR_DETECTORS:
+                culled_groups.append(cluster_predictions[:NR_DETECTORS])
             else:
-                culled_groups.append(group)
+                culled_groups.append(cluster_predictions)
 
+        # Regress trajectory parameters and visualize the predicted track
         pred = predict_angle(rnn, culled_groups)
-        predictions[event_id] = (pred,labels)
+        predictions[event_id] = pred
         
         labels = labels.detach().numpy()[0]
         labels = labels[labels != PAD_TOKEN]
         visualize_tracks(pred.detach().numpy(), "predicted")
         visualize_tracks(labels, "true")
 
-    avg_acc = sum(accuracies)/len(accuracies)
-    print("The accuracy of the transformer per group:")
-    print(accuracies)
-    print(f"Average accuracy achieved by the transformer: {avg_acc}")
-    print("The RNN's predicted track params:")
-    print(predictions)
+    print(pred)
+

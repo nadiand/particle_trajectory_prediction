@@ -31,7 +31,7 @@ class HitsDataset(Dataset):
         self.targets = labels
         if self.train:
             self.targets = self.targets.fillna(value=PAD_TOKEN)
-        self.shuffle = shuffle # True now because synthesized data has order, irl probably should be False
+        self.shuffle = shuffle # True now because synthesized data has order, irl probably False
         self.sort_data = sort_data
         self.sort_targets = sort_targets
         self.total_events = self.__len__()

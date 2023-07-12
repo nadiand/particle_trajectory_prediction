@@ -1,17 +1,13 @@
 import pandas as pd
-import numpy as np
-import math
-import tqdm
 import matplotlib.pyplot as plt
-from torch.utils.data import DataLoader
+import numpy as np
 from sklearn.cluster import AgglomerativeClustering
-import torch.nn as nn
 import torch
-from sklearn.metrics import accuracy_score
 
-from dataloader import get_dataloaders
 from trajectory_reconstruction import RNNModel, predict_angle
 from dataset import HitsDataset
+from visualization import visualize_tracks
+from dataloader import get_dataloaders
 from global_constants import *
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -23,8 +19,6 @@ def cluster_data(hits, visualize):
     to each hit. If *visualize* is True, it also plots the identified clusters.
     '''
     algo = AgglomerativeClustering(n_clusters=int(len(hits)/NR_DETECTORS), metric='cosine', linkage='average')
-
-    # algo = AgglomerativeClustering(distance_threshold=0.004, n_clusters=None, metric='cosine', linkage='average')
     cls = algo.fit_predict(hits)
 
     if visualize:
@@ -37,6 +31,27 @@ def cluster_data(hits, visualize):
         plt.show()
 
     return cls
+
+
+def calculate_purity(clusters, tracks_list):
+    '''
+    Calculates the purity of the clusters based on the ground truth given
+    by tracks_list.
+    '''
+    purity = 0.
+    cluster_list = list(clusters)
+    # Iterate over all clusters in the ground truth
+    for class_lbl in range(max(tracks_list)):
+        # For each cluster, get the indices of hits belonging to it
+        indices = [i for i,x in enumerate(tracks_list) if x == class_lbl]
+        # Get the corresponding predicted hits
+        cluster_indexed = [cluster_list[i] for i in indices]
+        # Calcualte the majority count
+        majority_label = np.argmax(np.bincount(cluster_indexed))
+        majority_count = np.sum(cluster_indexed == majority_label)
+        purity += majority_count
+    return purity/len(tracks_list)
+
 
 if __name__ == '__main__':
     # Prepare dataset
@@ -52,14 +67,10 @@ if __name__ == '__main__':
     checkpoint = torch.load("rnn_best")
     rnn.load_state_dict(checkpoint['model_state_dict'])
     optim.load_state_dict(checkpoint['optimizer_state_dict'])
-    epoch = checkpoint['epoch'] + 1
-    train_losses = checkpoint['train_losses']
-    val_losses = checkpoint['val_losses']
-    min_val_loss = min(val_losses)
-    count = checkpoint['count']
 
     # Predicting
     visualize = False
+    purity = 0.
     predictions = {}
     for data in test_loader:
         event_id, x, labels, track_labels = data
@@ -73,7 +84,7 @@ if __name__ == '__main__':
         
         # Cluster hits
         clusters = cluster_data(x_list, visualize)
-        accuracy = accuracy_score(list(clusters), tracks_list)
+        purity += calculate_purity(clusters, tracks_list)
 
         # Group hits together based on predicted cluster IDs
         groups = [ [] for _ in range(max(clusters)+1) ]
@@ -87,8 +98,14 @@ if __name__ == '__main__':
                 culled_groups.append(group[:NR_DETECTORS])
             else:
                 culled_groups.append(group)
-        # Regress trajectory parameters
+        # Regress trajectory parameters and visualize the predicted track
         pred = predict_angle(rnn, culled_groups)
+        print(purity/len(test_loader))
         predictions[event_id] = pred
+
+        labels = labels.detach().numpy()[0]
+        labels = labels[labels != PAD_TOKEN]
+        visualize_tracks(pred.detach().numpy(), "predicted by CL+RNN")
+        visualize_tracks(labels, "true")
     
     print(predictions)

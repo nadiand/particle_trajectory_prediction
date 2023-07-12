@@ -85,7 +85,7 @@ def visualize_tracks(angles, type):
     else: #dim==3
         for angle, angle2 in angles:
             x, y, z = np.sin(angle) * np.cos(angle2), np.sin(angle) * np.sin(angle2), np.cos(angle)
-            line = Line([0,0,0], [x,y,z])
+            line = Line([0,0,0], [x*NR_DETECTORS, y*NR_DETECTORS, z*NR_DETECTORS])
             line.plot_3d(ax)
         
     plt.title(f"Reconstruction of {type} tracks")

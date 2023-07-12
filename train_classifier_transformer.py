@@ -6,8 +6,8 @@ import tqdm
 
 from dataset import HitsDataset 
 from classifier_transformer import TransformerClassifier, AsymmetricMSELoss
-from global_constants import *
 from dataloader import get_dataloaders
+from global_constants import *
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -20,6 +20,7 @@ def make_prediction(model, data):
     data = data.to(DEVICE)
     data = data.transpose(0, 1)
     mask = torch.zeros((data.shape[0], data.shape[0]), device=DEVICE).type(torch.bool)
+    # Make padding mask which conveys whether an element is padding or not
     padding_mask = (data == PAD_TOKEN).all(dim=2).T
     pred = model(data, mask, padding_mask)
     pred = pred.transpose(0, 1)
@@ -33,7 +34,7 @@ def calc_accuracy(preds, labels):
     '''
     y_true = np.argmax(labels, axis=1)
     y_pred = np.argmax(preds, axis=1)
-    mask = np.logical_not(np.any(labels == PAD_TOKEN, axis=1)) # TODO investigate
+    mask = np.logical_not(np.any(labels == PAD_TOKEN, axis=1))
     y_true_filtered = y_true[mask]
     y_pred_filtered = y_pred[mask]
     accuracy = np.mean(y_true_filtered == y_pred_filtered)
@@ -134,7 +135,7 @@ def save_model(model, optim, type, val_losses, train_losses, epoch, count):
         'train_losses': train_losses,
         'val_losses': val_losses,
         'count': count,
-    }, "transformer_classifier_"+type)
+    }, "transformer_classifier_d1_"+type)
 
 
 if __name__ == '__main__':
@@ -166,7 +167,7 @@ if __name__ == '__main__':
     min_val_loss = np.inf
     count = 0
 
-    for epoch in range(10):#NUM_EPOCHS):
+    for epoch in range(NUM_EPOCHS):
         # Train the model
         train_loss, train_accuracy = train_epoch(transformer, optimizer, train_loader, loss_fn)
         # Evaluate on validation data

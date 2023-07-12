@@ -3,14 +3,24 @@ from global_constants import *
 
 
 class AsymmetricMSELoss(nn.Module):
+    '''
+    An implementation of a custom asymmetric loss function for the classifying
+    transformer. It applies a different penalty for different mistakes, i.e.
+    predicting 0 instead of 1 is punished much harsher than predicting 1 instead
+    of 0. The magnitude of punishment is given by MAX_NR_TRACKS-1.
+    '''
     def __init__(self):
         super(AsymmetricMSELoss, self).__init__()
 
     def forward(self, predicted_distribution, target_distribution):
+        # Calculate the squared error
         e = predicted_distribution - target_distribution
         se = e**2
+        # Calculate the "weights" for punishment
         weights = target_distribution*(MAX_NR_TRACKS-1)
-        ase = se * (weights+1) #+1 so we dont cancel out the 0s
+        # Multiply by the weights+1 (in order not to cancel out the 0s)
+        ase = se * (weights+1)
+        # Take the mean
         amse = ase.mean(dim=1)
         return amse.mean()
 

@@ -11,6 +11,8 @@ We implement the following:
 The folder `model_structures` contains all network architectures. The folder `training` contains the files for training, evaluation and prediction of the networks. The folder `best_models` contains example trained models.
 
 ### Data 
+There is a small sample dataset generated (2D, max 3 events, 5000 events in total) for testing purposes.
+
 To generate the data, simply run the `data_generation.py` file. The constants in the `global_constants.py` file decide what type of data will be generated. Relevant parameters to set: MAX_NR_TRACKS, DIM, NR_DETECTORS, EVENTS, data paths. By default, it generates a simple 2D dataset with 50,000 events, each of which having a maximum of 3 tracks, and 5 detectors. The data can also be 3D, and have any amount of tracks or events.
 
 ### Using the models
